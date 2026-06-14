@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}My Patients{% endblock %}
+{% block subnav %}
+<div class="subnav">
+  <a href="{{ url_for('chw.dashboard') }}">🏠 Home</a>
+  <a href="{{ url_for('chw.register_patient') }}">➕ Register Patient</a>
+  <a href="{{ url_for('chw.assess') }}">🩺 Assess & Triage</a>
+  <a href="{{ url_for('chw.patients') }}" class="active">👥 My Patients</a>
+</div>
+{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header" style="justify-content:space-between;">
+    <span>👥 My Registered Patients</span>
+    <a href="{{ url_for('chw.register_patient') }}" class="btn btn-primary btn-sm">+ Register New</a>
+  </div>
+  {% if patients %}
+  <table class="data-table">
+    <thead><tr><th>Name</th><th>Village</th><th>Age</th><th>Gender</th><th>Encounters</th><th>Last Seen</th><th>Highest Risk</th></tr></thead>
+    <tbody>
+    {% for p in patients %}
+    <tr>
+      <td><strong>{{ p.name }}</strong><br><span style="font-size:0.75rem;color:#718096;">{{ p.national_id }}</span></td>
+      <td>{{ p.village or '—' }}</td>
+      <td>{{ (p.age_months // 12) }}y {{ (p.age_months % 12) }}m</td>
+      <td>{{ p.gender }}</td>
+      <td>{{ p.encounter_count }}</td>
+      <td style="font-size:0.8rem;color:#718096;">{{ p.last_encounter[:10] if p.last_encounter else 'Never' }}</td>
+      <td>{% if p.highest_risk %}<span class="risk-badge risk-{{ p.highest_risk }}">{{ p.highest_risk }}</span>{% else %}—{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="placeholder"><span class="placeholder-icon">👥</span><p>No patients registered yet.<br><a href="{{ url_for('chw.register_patient') }}">Register your first patient →</a></p></div>
+  {% endif %}
+</div>
+{% endblock %}

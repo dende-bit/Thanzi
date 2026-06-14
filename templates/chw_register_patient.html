@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}Register Patient{% endblock %}
+{% block subnav %}
+<div class="subnav">
+  <a href="{{ url_for('chw.dashboard') }}">🏠 Home</a>
+  <a href="{{ url_for('chw.register_patient') }}" class="active">➕ Register Patient</a>
+  <a href="{{ url_for('chw.assess') }}">🩺 Assess & Triage</a>
+  <a href="{{ url_for('chw.patients') }}">👥 My Patients</a>
+</div>
+{% endblock %}
+{% block content %}
+<div style="max-width:560px;margin:0 auto;">
+<div class="card">
+  <div class="card-header">➕ Register New Patient</div>
+  {% if error %}<div class="emergency-banner">⛔ {{ error }}</div>{% endif %}
+  {% if success %}<div style="background:#e8f5ee;color:#1a6b3c;border:1px solid #68d391;border-radius:8px;padding:12px;margin-bottom:14px;font-weight:600;">✅ {{ success }}</div>{% endif %}
+  <form method="POST">
+    <div class="form-group"><label>National ID *</label><input type="text" name="national_id" placeholder="e.g. MWI-2024-001234" required></div>
+    <div class="form-group"><label>Full Name *</label><input type="text" name="name" placeholder="Patient full name" required></div>
+    <div class="inline-2">
+      <div class="form-group"><label>Age in Months *</label><input type="number" name="age_months" placeholder="e.g. 24 for 2 years" min="0" max="1200" required></div>
+      <div class="form-group"><label>Gender</label>
+        <select name="gender"><option>Unknown</option><option>Male</option><option>Female</option></select>
+      </div>
+    </div>
+    <div class="form-group"><label>Village</label><input type="text" name="village" placeholder="Village name"></div>
+    <button type="submit" class="btn btn-primary btn-full">Register Patient →</button>
+  </form>
+</div>
+</div>
+{% endblock %}

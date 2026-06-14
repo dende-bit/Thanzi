@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}Facilities{% endblock %}
+
+{% block subnav %}
+<div class="subnav">
+  <a href="{{ url_for('admin.dashboard') }}">📊 Overview</a>
+  <a href="{{ url_for('admin.register_worker') }}">➕ Register Worker</a>
+  <a href="{{ url_for('admin.list_workers') }}">👥 All Workers</a>
+  <a href="{{ url_for('admin.facilities') }}" class="active">🏥 Facilities</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">🏥 Facility Capacity Management</div>
+  <p style="font-size:0.85rem;color:#718096;margin-bottom:20px;">
+    Update real-time bed counts, blood stock, and facility status.
+    These values are used by Agent 4 when routing emergency referrals.
+  </p>
+
+  {% for f in facilities %}
+  <div style="border:1.5px solid #e2e8f0;border-radius:10px;padding:18px;margin-bottom:16px;">
+    <h3 style="color:#1a6b3c;margin-bottom:4px;">{{ f.name }}</h3>
+    <p style="font-size:0.82rem;color:#718096;margin-bottom:14px;">
+      📍 {{ f.location }} &nbsp;|&nbsp; 🛣 {{ f.distance_km }} km
+    </p>
+    <form method="POST" action="{{ url_for('admin.update_facility') }}">
+      <input type="hidden" name="facility_id" value="{{ f.id }}">
+      <div class="inline-3">
+        <div class="form-group">
+          <label>Beds Available</label>
+          <input type="number" name="beds_available"
+                 value="{{ f.beds_available }}" min="0" max="500">
+        </div>
+        <div class="form-group">
+          <label>Maternity Beds</label>
+          <input type="number" name="maternity_beds"
+                 value="{{ f.maternity_beds }}" min="0" max="100">
+        </div>
+        <div class="form-group">
+          <label>Blood Stock</label>
+          <select name="blood_stock">
+            <option {% if f.blood_stock=='Available' %}selected{% endif %}>Available</option>
+            <option {% if f.blood_stock=='Low' %}selected{% endif %}>Low</option>
+            <option {% if f.blood_stock=='Empty' %}selected{% endif %}>Empty</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Facility Status</label>
+        <select name="status">
+          <option {% if f.status=='ACTIVE' %}selected{% endif %}>ACTIVE</option>
+          <option {% if f.status=='FULL' %}selected{% endif %}>FULL</option>
+          <option {% if f.status=='INACTIVE' %}selected{% endif %}>INACTIVE</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">
+        Update {{ f.name }}
+      </button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

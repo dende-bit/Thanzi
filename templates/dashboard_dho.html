@@ -1,0 +1,421 @@
+{% extends 'base.html' %}
+{% block title %}DHO Command Hub{% endblock %}
+
+{% block subnav %}
+<div class="subnav">
+  <a href="{{ url_for('dho.dashboard') }}" class="active">🎯 Command Hub</a>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.intel-section{margin-bottom:14px;}
+.intel-section .lbl{font-size:0.72rem;font-weight:700;color:#718096;
+                    text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;}
+.outbreak-card{border-left:4px solid #c53030;background:#fff5f5;
+               border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:8px;}
+.trend-row{display:flex;align-items:center;gap:10px;padding:7px 0;
+           border-bottom:1px solid #f0f4f8;font-size:0.83rem;}
+.trend-row:last-child{border-bottom:none;}
+.bar{height:8px;border-radius:4px;background:#e2e8f0;flex:1;overflow:hidden;}
+.bar-fill{height:100%;border-radius:4px;}
+.perf-row{display:flex;align-items:center;justify-content:space-between;
+          padding:9px 14px;border-bottom:1px solid #f0f4f8;font-size:0.83rem;}
+.perf-row:last-child{border-bottom:none;}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Stat Row ── -->
+<div class="grid-4" style="margin-bottom:20px;">
+  <div class="stat-box red">
+    <div class="stat-num">{{ stats.high_risk }}</div>
+    <div class="stat-lbl">HIGH Risk Total</div>
+  </div>
+  <div class="stat-box amber">
+    <div class="stat-num">{{ stats.total_referrals }}</div>
+    <div class="stat-lbl">Total Referrals</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-num">{{ stats.total_patients }}</div>
+    <div class="stat-lbl">Registered Patients</div>
+  </div>
+  <div class="stat-box blue">
+    <div class="stat-num">{{ stats.villages_covered }}</div>
+    <div class="stat-lbl">Villages Covered</div>
+  </div>
+</div>
+
+<div class="grid-4" style="margin-bottom:20px;">
+  <div class="stat-box">
+    <div class="stat-num">{{ stats.total_encounters }}</div>
+    <div class="stat-lbl">Total Encounters</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-num">{{ stats.active_chws }}</div>
+    <div class="stat-lbl">Active CHWs</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-num">{{ stats.total_escalations }}</div>
+    <div class="stat-lbl">Escalations</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-num">{{ stats.new_today }}</div>
+    <div class="stat-lbl">New Today</div>
+  </div>
+</div>
+
+<!-- ── AI Intelligence Report ── -->
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-header" style="justify-content:space-between;">
+    <span>🧠 AI District Intelligence — Microsoft Phi-4</span>
+    <button class="btn btn-primary btn-sm" onclick="loadIntelligence()">
+      Generate Intelligence Report →
+    </button>
+  </div>
+  <div id="intelligence-result">
+    <div class="placeholder">
+      <span class="placeholder-icon">🧠</span>
+      <p>Click Generate Intelligence Report for AI strategic analysis.</p>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+
+<!-- ── Outbreak Early Warning ── -->
+<div class="card">
+  <div class="card-header">🚨 Outbreak Early Warning System</div>
+  <p style="font-size:0.8rem;color:#718096;margin-bottom:12px;">
+    Villages with 2+ patients reporting similar symptoms in the last 7 days.
+  </p>
+  {% if outbreak_watch %}
+    {% for o in outbreak_watch %}
+    <div class="outbreak-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <strong>{{ o.village }}</strong>
+        <span style="background:#c53030;color:white;font-size:0.72rem;
+                     padding:2px 8px;border-radius:10px;font-weight:700;">
+          {{ o.case_count }} cases
+        </span>
+      </div>
+      <div style="font-size:0.8rem;color:#4a5568;margin-top:4px;">
+        {{ o.symptoms_english[:80] }}
+        {% if o.symptoms_english|length > 80 %}...{% endif %}
+      </div>
+      <div style="font-size:0.72rem;color:#a0aec0;margin-top:2px;">
+        Latest: {{ o.latest[:10] }}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="placeholder">
+      <span class="placeholder-icon">✅</span>
+      <p>No outbreak signals detected in the last 7 days.</p>
+    </div>
+  {% endif %}
+</div>
+
+<!-- ── CHW Performance ── -->
+<div class="card">
+  <div class="card-header">👥 CHW Performance</div>
+  {% if chw_performance %}
+    {% for c in chw_performance %}
+    <div class="perf-row">
+      <div>
+        <strong>{{ c.full_name }}</strong><br>
+        <span style="font-size:0.75rem;color:#718096;">
+          {{ c.catchment_area or '—' }}
+          · Last active: {{ c.last_active[:10] if c.last_active else 'Never' }}
+        </span>
+      </div>
+      <div style="text-align:right;font-size:0.82rem;">
+        <span style="color:#2d9b5a;font-weight:700;">
+          {{ c.total_encounters }} encounters
+        </span><br>
+        <span style="color:#c53030;">{{ c.high_risk }} HIGH</span>
+        <span style="color:#718096;margin-left:6px;">
+          {{ c.referrals }} referrals
+        </span>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="placeholder">
+      <span class="placeholder-icon">👥</span>
+      <p>No CHW data available.</p>
+    </div>
+  {% endif %}
+</div>
+
+</div>
+
+<div class="grid-2">
+
+<!-- ── Disease Trends ── -->
+<div class="card">
+  <div class="card-header">📈 Encounter Trends — Last 14 Days</div>
+  {% if disease_trends %}
+    {% for t in disease_trends %}
+    {% set max_val = disease_trends[0].total if disease_trends[0].total > 0 else 1 %}
+    <div class="trend-row">
+      <span style="font-size:0.75rem;color:#718096;width:80px;flex-shrink:0;">
+        {{ t.encounter_date }}
+      </span>
+      <div class="bar">
+        <div class="bar-fill"
+             style="width:{{ (t.total / max_val * 100)|int }}%;
+                    background:{% if t.high > 0 %}#c53030{% else %}#2d9b5a{% endif %};">
+        </div>
+      </div>
+      <span style="font-size:0.78rem;font-weight:700;width:30px;
+                   text-align:right;flex-shrink:0;">
+        {{ t.total }}
+      </span>
+      {% if t.high > 0 %}
+      <span style="font-size:0.72rem;color:#c53030;flex-shrink:0;">
+        {{ t.high }}H
+      </span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="placeholder">
+      <span class="placeholder-icon">📈</span>
+      <p>No encounter data yet.</p>
+    </div>
+  {% endif %}
+</div>
+
+<!-- ── Facility Management ── -->
+<div class="card">
+  <div class="card-header">🏥 Live Facility Management</div>
+  <p style="font-size:0.8rem;color:#718096;margin-bottom:14px;">
+    Update capacity in real time. Agent 4 uses these values for referral routing.
+  </p>
+  {% for f in facilities %}
+  <div style="border:1.5px solid #e2e8f0;border-radius:9px;
+              padding:14px;margin-bottom:12px;">
+    <div style="font-weight:700;margin-bottom:2px;">{{ f.name }}</div>
+    <div style="font-size:0.75rem;color:#718096;margin-bottom:10px;">
+      {{ f.tier }} · {{ f.location }} · {{ f.distance_km }} km
+    </div>
+    <div class="inline-3">
+      <div class="form-group" style="margin:0;">
+        <label>Beds</label>
+        <input type="number" id="beds-{{ f.id }}"
+               value="{{ f.beds_available }}" min="0"
+               style="padding:7px 10px;">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Maternity</label>
+        <input type="number" id="maternity-{{ f.id }}"
+               value="{{ f.maternity_beds }}" min="0"
+               style="padding:7px 10px;">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Blood</label>
+        <select id="blood-{{ f.id }}" style="padding:7px 10px;">
+          <option {% if f.blood_stock=='Available' %}selected{% endif %}>Available</option>
+          <option {% if f.blood_stock=='Low' %}selected{% endif %}>Low</option>
+          <option {% if f.blood_stock=='Empty' %}selected{% endif %}>Empty</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group" style="margin-top:8px;margin-bottom:0;">
+      <label>Status</label>
+      <select id="status-{{ f.id }}" style="padding:7px 10px;">
+        <option {% if f.status=='ACTIVE' %}selected{% endif %}>ACTIVE</option>
+        <option {% if f.status=='FULL' %}selected{% endif %}>FULL</option>
+        <option {% if f.status=='INACTIVE' %}selected{% endif %}>INACTIVE</option>
+      </select>
+    </div>
+    <button class="btn btn-primary btn-sm" style="margin-top:10px;"
+            onclick="updateFacility({{ f.id }})">
+      Update {{ f.name.split()[0] }} →
+    </button>
+    <span id="fac-msg-{{ f.id }}"
+          style="font-size:0.78rem;margin-left:10px;"></span>
+  </div>
+  {% endfor %}
+</div>
+
+</div>
+
+<!-- ── Top Villages ── -->
+{% if top_villages %}
+<div class="card">
+  <div class="card-header">📍 Top Villages by Patient Load</div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    {% for v in top_villages %}
+    <div style="background:#f0fff4;border:1px solid #68d391;border-radius:8px;
+                padding:10px 18px;text-align:center;">
+      <div style="font-weight:700;color:#1a6b3c;">{{ v.village }}</div>
+      <div style="font-size:0.82rem;color:#718096;">{{ v.case_count }} patients</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+
+// ── AI Intelligence Report ────────────────────────────────────────────
+async function loadIntelligence() {
+  document.getElementById('intelligence-result').innerHTML =
+    `<div class="loading"><div class="spinner"></div>
+     <span>Generating district intelligence... (30–60 sec)</span></div>`;
+  try {
+    const res = await fetch('/dho/api/intelligence');
+    if (res.status === 401) { window.location.href = '/login'; return; }
+    const r = await res.json();
+    if (r.error) {
+      document.getElementById('intelligence-result').innerHTML =
+        `<p style="color:#c53030">${r.error}</p>`;
+      return;
+    }
+
+    const riskColor = r.population_risk_score === 'CRITICAL' ? '#c53030'
+                    : r.population_risk_score === 'HIGH'     ? '#b7791f'
+                    : r.population_risk_score === 'MEDIUM'   ? '#d69e2e'
+                    : '#276749';
+
+    let html = `
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+        <div style="background:${riskColor};color:white;padding:6px 16px;
+                    border-radius:20px;font-weight:700;font-size:0.88rem;">
+          Population Risk: ${r.population_risk_score || '—'}
+        </div>
+        <span style="font-size:0.8rem;color:#718096;">${r.report_date || ''}</span>
+      </div>
+      <div style="background:#e8f5ee;border-radius:8px;padding:14px;margin-bottom:14px;">
+        <div style="font-size:0.72rem;font-weight:700;color:#1a6b3c;
+                    text-transform:uppercase;margin-bottom:4px;">
+          Executive Summary
+        </div>
+        <p style="font-size:0.88rem;">${r.executive_summary || ''}</p>
+      </div>`;
+
+    if (r.disease_burden) {
+      const db = r.disease_burden;
+      html += `
+        <div style="margin-bottom:14px;">
+          <div style="font-size:0.72rem;font-weight:700;color:#718096;
+                      text-transform:uppercase;margin-bottom:6px;">
+            Disease Burden
+          </div>
+          <div class="grid-3">
+            <div style="background:#f7fafc;border-radius:7px;padding:10px;">
+              <div style="font-size:0.72rem;color:#718096;">Top Conditions</div>
+              <div style="font-size:0.82rem;margin-top:3px;">
+                ${(db.top_conditions || []).join(', ') || '—'}
+              </div>
+            </div>
+            <div style="background:#f7fafc;border-radius:7px;padding:10px;">
+              <div style="font-size:0.72rem;color:#718096;">High Risk Villages</div>
+              <div style="font-size:0.82rem;margin-top:3px;">
+                ${(db.high_risk_villages || []).join(', ') || '—'}
+              </div>
+            </div>
+            <div style="background:#f7fafc;border-radius:7px;padding:10px;">
+              <div style="font-size:0.72rem;color:#718096;">Most Affected Age</div>
+              <div style="font-size:0.82rem;margin-top:3px;">
+                ${db.age_group_most_affected || '—'}
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    if (r.strategic_recommendations && r.strategic_recommendations.length) {
+      html += `
+        <div>
+          <div style="font-size:0.72rem;font-weight:700;color:#718096;
+                      text-transform:uppercase;margin-bottom:8px;">
+            Strategic Recommendations
+          </div>`;
+      r.strategic_recommendations.forEach((rec, i) => {
+        const col = rec.priority === 'CRITICAL' ? '#c53030'
+                  : rec.priority === 'HIGH'     ? '#b7791f' : '#276749';
+        html += `
+          <div style="display:flex;gap:10px;padding:9px 0;
+                      border-bottom:1px solid #f0f4f8;">
+            <span style="background:${col};color:white;border-radius:50%;
+                         width:22px;height:22px;display:flex;align-items:center;
+                         justify-content:center;font-size:0.72rem;
+                         flex-shrink:0;font-weight:700;">
+              ${i + 1}
+            </span>
+            <div style="font-size:0.85rem;">
+              ${rec.recommendation}
+              <span style="color:#718096;font-size:0.78rem;">
+                — ${rec.responsible_party}
+              </span>
+              <span style="background:${col};color:white;font-size:0.65rem;
+                           padding:1px 6px;border-radius:4px;margin-left:6px;">
+                ${rec.priority}
+              </span>
+            </div>
+          </div>`;
+      });
+      html += `</div>`;
+    }
+
+    if (r.resource_gaps && r.resource_gaps.length) {
+      html += `
+        <div style="background:#fffbeb;border-radius:7px;padding:10px;margin-top:12px;">
+          <strong style="font-size:0.78rem;">⚠️ Resource Gaps:</strong>
+          <span style="font-size:0.82rem;">
+            ${r.resource_gaps.join(' · ')}
+          </span>
+        </div>`;
+    }
+
+    html += `
+      <div style="font-size:0.72rem;color:#718096;font-style:italic;margin-top:10px;">
+        ${r._model || 'Microsoft Phi-4 via Azure AI Foundry'}
+      </div>`;
+
+    document.getElementById('intelligence-result').innerHTML = html;
+  } catch (e) {
+    document.getElementById('intelligence-result').innerHTML =
+      `<p style="color:#c53030">Error: ${e.message}</p>`;
+  }
+}
+
+// ── Update Facility ───────────────────────────────────────────────────
+async function updateFacility(facilityId) {
+  const payload = {
+    facility_id:    facilityId,
+    beds_available: document.getElementById(`beds-${facilityId}`).value,
+    maternity_beds: document.getElementById(`maternity-${facilityId}`).value,
+    blood_stock:    document.getElementById(`blood-${facilityId}`).value,
+    status:         document.getElementById(`status-${facilityId}`).value,
+  };
+  try {
+    const res = await fetch('/dho/api/update-facility', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if (res.status === 401) { window.location.href = '/login'; return; }
+    const r = await res.json();
+    const msg = document.getElementById(`fac-msg-${facilityId}`);
+    if (r.success) {
+      msg.style.color = '#276749';
+      msg.textContent = '✅ Updated';
+      setTimeout(() => msg.textContent = '', 3000);
+    } else {
+      msg.style.color = '#c53030';
+      msg.textContent = '❌ ' + (r.error || 'Failed');
+    }
+  } catch (e) {
+    alert('Connection error.');
+  }
+}
+</script>
+{% endblock %}

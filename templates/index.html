@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thanzi — Community Health Agent</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',sans-serif;background:#f0f4f8;color:#2d3748;}
+header{background:linear-gradient(135deg,#1a6b3c,#2d9b5a);color:white;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;}
+header h1{font-size:1.8rem;letter-spacing:1px;}
+header p{font-size:0.85rem;opacity:0.85;}
+.header-right{display:flex;align-items:center;gap:12px;}
+.status-dot{width:10px;height:10px;border-radius:50%;background:#6fcf97;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+.agent-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;}
+.badge{background:rgba(255,255,255,0.2);padding:2px 10px;border-radius:12px;font-size:0.72rem;}
+
+nav{background:#1a6b3c;display:flex;gap:0;border-bottom:3px solid #145a32;}
+nav button{background:none;border:none;color:rgba(255,255,255,0.7);padding:12px 22px;cursor:pointer;font-size:0.88rem;font-weight:600;transition:all 0.2s;border-bottom:3px solid transparent;margin-bottom:-3px;}
+nav button.active,nav button:hover{color:white;border-bottom-color:#6fcf97;background:rgba(255,255,255,0.08);}
+
+.tab-content{display:none;max-width:1300px;margin:24px auto;padding:0 20px;}
+.tab-content.active{display:block;}
+
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;}
+.full{grid-column:1/-1;}
+
+.card{background:white;border-radius:12px;padding:22px;box-shadow:0 2px 12px rgba(0,0,0,0.07);}
+.card h2{font-size:1rem;color:#1a6b3c;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #e2e8f0;display:flex;align-items:center;gap:8px;}
+
+.form-group{margin-bottom:13px;}
+label{display:block;font-size:0.8rem;font-weight:600;color:#4a5568;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.4px;}
+input,textarea,select{width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.9rem;font-family:inherit;transition:border 0.2s;}
+input:focus,textarea:focus{outline:none;border-color:#2d9b5a;}
+textarea{height:72px;resize:vertical;}
+
+.voice-bar{display:flex;gap:8px;margin-bottom:13px;}
+.voice-bar input{flex:1;}
+.mic-btn{width:42px;height:42px;border-radius:50%;border:none;background:#1a6b3c;color:white;font-size:1.1rem;cursor:pointer;transition:all 0.2s;flex-shrink:0;}
+.mic-btn:hover{background:#145a32;transform:scale(1.08);}
+.mic-btn.recording{background:#c0392b;animation:pulse 0.8s infinite;}
+
+.btn{width:100%;padding:11px;background:linear-gradient(135deg,#1a6b3c,#2d9b5a);color:white;border:none;border-radius:8px;font-size:0.95rem;font-weight:700;cursor:pointer;transition:opacity 0.2s;margin-top:4px;}
+.btn:hover{opacity:0.88;}
+.btn:disabled{opacity:0.5;cursor:not-allowed;}
+.btn-secondary{background:linear-gradient(135deg,#2c5282,#2b6cb0);}
+.btn-danger{background:linear-gradient(135deg,#c0392b,#e74c3c);}
+.btn-sm{padding:7px 14px;font-size:0.82rem;width:auto;border-radius:6px;font-weight:600;}
+
+.risk-badge{display:inline-block;padding:5px 14px;border-radius:16px;font-weight:700;font-size:0.85rem;margin-bottom:12px;}
+.HIGH{background:#fff5f5;color:#c53030;border:2px solid #fc8181;}
+.MEDIUM{background:#fffbeb;color:#b7791f;border:2px solid #f6ad55;}
+.LOW{background:#f0fff4;color:#276749;border:2px solid #68d391;}
+
+.emergency-banner{background:#c53030;color:white;padding:12px 18px;border-radius:8px;margin-bottom:14px;font-weight:700;display:flex;align-items:center;gap:10px;animation:pulse 1.5s infinite;}
+
+.result-section{margin-bottom:12px;}
+.result-section strong{display:block;font-size:0.74rem;color:#718096;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;}
+.result-section p{font-size:0.92rem;line-height:1.55;}
+
+.agent-tag{background:#e8f5ee;color:#1a6b3c;font-size:0.72rem;padding:2px 8px;border-radius:10px;font-weight:600;}
+.model-tag{background:#e8f0fe;color:#2c5282;font-size:0.72rem;padding:2px 8px;border-radius:10px;font-weight:600;}
+
+.triage-item{border:1px solid #e2e8f0;border-radius:8px;padding:13px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;}
+.rank-circle{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.95rem;flex-shrink:0;}
+.rank-HIGH{background:#fff5f5;color:#c53030;border:2px solid #fc8181;}
+.rank-MEDIUM{background:#fffbeb;color:#b7791f;border:2px solid #f6ad55;}
+.rank-LOW{background:#f0fff4;color:#276749;border:2px solid #68d391;}
+.triage-info h4{font-size:0.92rem;margin-bottom:3px;}
+.triage-info p{font-size:0.82rem;color:#718096;}
+.triage-info .action{font-size:0.82rem;color:#2d3748;margin-top:3px;font-style:italic;}
+.escalate-tag{background:#c53030;color:white;font-size:0.68rem;padding:1px 7px;border-radius:8px;margin-left:6px;}
+
+.placeholder{text-align:center;color:#a0aec0;padding:40px 20px;}
+.placeholder span{font-size:2.5rem;display:block;margin-bottom:8px;}
+
+.loading{display:flex;align-items:center;justify-content:center;gap:10px;color:#718096;padding:30px;}
+.spinner{width:22px;height:22px;border:3px solid #e2e8f0;border-top:3px solid #2d9b5a;border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+.patient-entry{background:#f7fafc;border-radius:8px;padding:14px;margin-bottom:10px;border:1px solid #e2e8f0;position:relative;}
+.patient-entry h4{font-size:0.82rem;color:#718096;margin-bottom:8px;}
+.inline-2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.add-btn{width:100%;padding:9px;background:transparent;color:#2d9b5a;border:2px dashed #2d9b5a;border-radius:8px;font-size:0.88rem;cursor:pointer;margin-bottom:12px;transition:all 0.2s;}
+.add-btn:hover{background:#f0fff4;}
+
+.registry-table{width:100%;border-collapse:collapse;font-size:0.82rem;}
+.registry-table th{background:#1a6b3c;color:white;padding:9px 12px;text-align:left;}
+.registry-table td{padding:8px 12px;border-bottom:1px solid #e2e8f0;}
+.registry-table tr:hover td{background:#f7fafc;}
+.registry-table tr:nth-child(even) td{background:#fafafa;}
+
+.clinic-card{border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:10px;}
+.clinic-card h4{font-size:0.92rem;font-weight:700;margin-bottom:8px;color:#2d3748;}
+.clinic-stat{display:flex;justify-content:space-between;font-size:0.82rem;padding:3px 0;border-bottom:1px solid #f0f0f0;}
+.stat-good{color:#276749;font-weight:600;}
+.stat-warn{color:#b7791f;font-weight:600;}
+.stat-bad{color:#c53030;font-weight:600;}
+
+.briefing-card{background:linear-gradient(135deg,#1a6b3c,#2d9b5a);color:white;border-radius:12px;padding:22px;margin-bottom:16px;}
+.briefing-card h3{font-size:1.1rem;margin-bottom:6px;}
+.briefing-card p{opacity:0.9;font-size:0.92rem;line-height:1.6;}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px;}
+.stat-box{background:rgba(255,255,255,0.15);border-radius:8px;padding:12px;text-align:center;}
+.stat-box .num{font-size:1.8rem;font-weight:800;}
+.stat-box .lbl{font-size:0.75rem;opacity:0.85;}
+
+.flow-diagram{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;padding:14px;background:#f7fafc;border-radius:8px;border:1px solid #e2e8f0;}
+.flow-step{background:white;border:2px solid #2d9b5a;border-radius:8px;padding:8px 12px;font-size:0.78rem;font-weight:700;color:#1a6b3c;text-align:center;min-width:90px;}
+.flow-arrow{color:#2d9b5a;font-size:1.1rem;font-weight:700;}
+
+.save-bar{display:flex;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid #e2e8f0;}
+
+.lang-tag{display:inline-block;background:#e8f0fe;color:#2c5282;font-size:0.75rem;padding:2px 8px;border-radius:10px;margin-bottom:8px;}
+
+@media(max-width:768px){.grid-2,.grid-3{grid-template-columns:1fr;}.tab-content{padding:0 12px;}.flow-diagram{flex-direction:column;}}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🌿 Thanzi</h1>
+    <p>Community Health Intelligence Agent — Serving Malawi's Health Workers</p>
+    <div class="agent-badges">
+      <span class="badge">Agent 1: Voice Extraction</span>
+      <span class="badge">Agent 2: Assessment</span>
+      <span class="badge">Agent 3: Triage</span>
+      <span class="badge">Agent 4: Escalation</span>
+      <span class="badge">Agent 5: Supervisor</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-dot" id="statusDot"></div>
+    <span style="font-size:0.82rem;opacity:0.85;">Microsoft Phi-4 | Azure AI Foundry</span>
+  </div>
+</header>
+
+<nav>
+  <button class="active" onclick="showTab('assess')">🏥 Patient Assessment</button>
+  <button onclick="showTab('triage')">📊 Triage Planner</button>
+  <button onclick="showTab('escalate')">🚨 Escalation</button>
+  <button onclick="showTab('registry')">📋 Patient Registry</button>
+  <button onclick="showTab('supervisor')">👔 Supervisor</button>
+  <button onclick="showTab('clinics')">🏨 Clinics</button>
+</nav>
+
+<!-- ═══ TAB 1: PATIENT ASSESSMENT ═══ -->
+<div class="tab-content active" id="tab-assess">
+  <div class="flow-diagram">
+    <div class="flow-step">🎤 Voice Input</div><div class="flow-arrow">→</div>
+    <div class="flow-step">Agent 1<br>Extract</div><div class="flow-arrow">→</div>
+    <div class="flow-step">Auto-fill<br>Form</div><div class="flow-arrow">→</div>
+    <div class="flow-step">Agent 2<br>Assess</div><div class="flow-arrow">→</div>
+    <div class="flow-step">Risk Result<br>+ Action</div><div class="flow-arrow">→</div>
+    <div class="flow-step">💾 Save to<br>Registry</div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <h2>🎤 Voice Input (Chichewa / English)</h2>
+      <div class="form-group">
+        <label>Speak or type patient description</label>
+        <div class="voice-bar">
+          <textarea id="voiceInput" placeholder="Example: Mwana wa Grace Banda ali ndi matenda. Mwezi 8, kilogram 6.2, kulibe chanjira.&#10;&#10;Or in English: Grace Banda's child is sick. 8 months old, 6.2kg, not vaccinated."></textarea>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button class="mic-btn" id="micBtn" onclick="toggleVoice()" title="Click to speak">🎤</button>
+          <button class="btn btn-secondary" style="flex:1;" onclick="extractFromVoice()">Extract Patient Info →</button>
+        </div>
+        <div id="langTag" style="margin-top:6px;"></div>
+      </div>
+
+      <hr style="margin:16px 0;border:none;border-top:1px solid #e2e8f0;">
+      <h2 style="border:none;padding:0;margin-bottom:14px;">📝 Patient Details</h2>
+
+      <div class="form-group">
+        <label>Patient Name</label>
+        <input type="text" id="pName" placeholder="e.g. Grace Banda">
+      </div>
+      <div class="inline-2">
+        <div class="form-group">
+          <label>Age</label>
+          <input type="text" id="pAge" placeholder="e.g. 8 months">
+        </div>
+        <div class="form-group">
+          <label>Village</label>
+          <input type="text" id="pVillage" placeholder="e.g. Mtendere">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Symptoms (original language)</label>
+        <textarea id="pSymptomsOrig" placeholder="Symptoms as spoken/typed"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Symptoms (English)</label>
+        <textarea id="pSymptomsEng" placeholder="English translation"></textarea>
+      </div>
+      <div class="inline-2">
+        <div class="form-group">
+          <label>Duration</label>
+          <input type="text" id="pDuration" placeholder="e.g. 3 days">
+        </div>
+        <div class="form-group">
+          <label>CHW Name</label>
+          <input type="text" id="chwName" placeholder="Your name">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Additional Notes</label>
+        <input type="text" id="pNotes" placeholder="Weight, pregnancy, last visit...">
+      </div>
+      <button class="btn" onclick="assessPatient()">🔍 Run Clinical Assessment (Agent 2)</button>
+    </div>
+
+    <div class="card">
+      <h2>📋 Assessment Result</h2>
+      <div id="assessResult">
+        <div class="placeholder"><span>🩺</span><p>Fill in patient details and click<br>Run Clinical Assessment</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB 2: TRIAGE ═══ -->
+<div class="tab-content" id="tab-triage">
+  <div class="grid-2">
+    <div class="card">
+      <h2>📊 Add Patients for Triage</h2>
+      <div id="triagePatients">
+        <div class="patient-entry">
+          <h4>Patient 1</h4>
+          <div class="inline-2">
+            <input type="text" placeholder="Name" class="tp-name">
+            <input type="text" placeholder="Age" class="tp-age">
+          </div>
+          <textarea placeholder="Symptoms..." class="tp-symptoms" style="margin-top:8px;height:58px;"></textarea>
+        </div>
+      </div>
+      <button class="add-btn" onclick="addTriagePatient()">+ Add Another Patient</button>
+      <button class="btn" onclick="runTriage()">📊 Run Triage — Prioritize Visits (Agent 3)</button>
+    </div>
+    <div class="card">
+      <h2>🏆 Priority Visit Order</h2>
+      <div id="triageResult">
+        <div class="placeholder"><span>📊</span><p>Add patients and run triage<br>to see priority order</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB 3: ESCALATION ═══ -->
+<div class="tab-content" id="tab-escalate">
+  <div class="grid-2">
+    <div class="card">
+      <h2>🚨 Emergency Escalation (Agent 4)</h2>
+      <p style="font-size:0.84rem;color:#718096;margin-bottom:14px;">After assessing a HIGH risk patient, use this to find the best clinic and generate referral documents automatically.</p>
+      <div class="form-group">
+        <label>Patient Name</label>
+        <input type="text" id="escName" placeholder="Patient name">
+      </div>
+      <div class="inline-2">
+        <div class="form-group">
+          <label>Age</label>
+          <input type="text" id="escAge" placeholder="Age">
+        </div>
+        <div class="form-group">
+          <label>Risk Level</label>
+          <select id="escRisk">
+            <option value="HIGH">HIGH</option>
+            <option value="MEDIUM">MEDIUM</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Symptoms</label>
+        <textarea id="escSymptoms" placeholder="Patient symptoms..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Assessment Summary</label>
+        <textarea id="escAssessment" placeholder="Clinical assessment from Agent 2..."></textarea>
+      </div>
+      <button class="btn btn-danger" onclick="runEscalation()">🚨 Escalate — Find Clinic + Generate Referral</button>
+    </div>
+    <div class="card">
+      <h2>📄 Escalation Result</h2>
+      <div id="escalateResult">
+        <div class="placeholder"><span>🚨</span><p>Fill in patient details<br>and run escalation</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB 4: REGISTRY ═══ -->
+<div class="tab-content" id="tab-registry">
+  <div class="card">
+    <h2>📋 Patient Registry — Excel Database</h2>
+    <div style="display:flex;gap:10px;margin-bottom:16px;">
+      <button class="btn btn-secondary btn-sm" onclick="loadRegistry()">🔄 Refresh Registry</button>
+      <span id="registryCount" style="font-size:0.85rem;color:#718096;align-self:center;"></span>
+    </div>
+    <div id="registryContent">
+      <div class="placeholder"><span>📋</span><p>Click Refresh Registry to load patient records</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB 5: SUPERVISOR ═══ -->
+<div class="tab-content" id="tab-supervisor">
+  <div class="card full" style="margin-bottom:16px;">
+    <h2>👔 Supervisor Morning Briefing (Agent 5)</h2>
+    <button class="btn btn-secondary" style="width:auto;padding:10px 24px;" onclick="loadBriefing()">📊 Generate District Briefing</button>
+  </div>
+  <div id="briefingResult">
+    <div class="placeholder"><span>👔</span><p>Click Generate District Briefing<br>to see today's summary</p></div>
+  </div>
+</div>
+
+<!-- ═══ TAB 6: CLINICS ═══ -->
+<div class="tab-content" id="tab-clinics">
+  <div class="card">
+    <h2>🏨 Live Clinic Capacity — Lilongwe District</h2>
+    <div id="clinicsContent">
+      <div class="loading"><div class="spinner"></div><span>Loading clinic data...</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────
+let currentAssessment = null;
+let currentPatient = null;
+let currentEscalation = null;
+let recognition = null;
+let isRecording = false;
+let triageCount = 1;
+
+// ── TABS ───────────────────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'clinics') loadClinics();
+}
+
+// ── VOICE ──────────────────────────────────────────────────────────────────
+function toggleVoice() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    alert('Voice recognition not supported in this browser. Please use Chrome.');
+    return;
+  }
+  if (isRecording) {
+    recognition.stop();
+    return;
+  }
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+  const btn = document.getElementById('micBtn');
+  recognition.onstart = () => {
+    isRecording = true;
+    btn.classList.add('recording');
+    btn.textContent = '⏹';
+    btn.title = 'Recording... click to stop';
+  };
+  recognition.onresult = (e) => {
+    let transcript = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      transcript += e.results[i][0].transcript;
+    }
+    document.getElementById('voiceInput').value = transcript;
+  };
+  recognition.onend = () => {
+    isRecording = false;
+    btn.classList.remove('recording');
+    btn.textContent = '🎤';
+    btn.title = 'Click to speak';
+  };
+  recognition.start();
+}
+
+// ── AGENT 1: EXTRACT ───────────────────────────────────────────────────────
+async function extractFromVoice() {
+  const raw = document.getElementById('voiceInput').value.trim();
+  if (!raw) { alert('Please type or speak a patient description first.'); return; }
+
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Extracting...';
+
+  try {
+    const res = await fetch('/extract', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({raw_input: raw})
+    });
+    const data = await res.json();
+    if (data.error) { alert('Error: ' + data.error); return; }
+
+    // Auto-fill fields
+    if (data.patient_name && data.patient_name !== 'Unknown') document.getElementById('pName').value = data.patient_name;
+    if (data.age && data.age !== 'Unknown') document.getElementById('pAge').value = data.age;
+    if (data.village && data.village !== 'Unknown') document.getElementById('pVillage').value = data.village;
+    if (data.symptoms_original) document.getElementById('pSymptomsOrig').value = data.symptoms_original;
+    if (data.symptoms_english) document.getElementById('pSymptomsEng').value = data.symptoms_english;
+    if (data.duration) document.getElementById('pDuration').value = data.duration;
+
+    // Show language tag
+    const langTag = document.getElementById('langTag');
+    langTag.innerHTML = `<span class="lang-tag">🌍 ${data.detected_language || 'Language detected'} — Confidence: ${data.confidence || 'HIGH'}</span>
+    <span class="agent-tag" style="margin-left:6px;">${data._agent}</span>`;
+
+  } catch(e) {
+    alert('Connection error. Make sure the server is running.');
+  }
+  btn.disabled = false;
+  btn.textContent = 'Extract Patient Info →';
+}
+
+// ── AGENT 2: ASSESS ────────────────────────────────────────────────────────
+async function assessPatient() {
+  const name = document.getElementById('pName').value;
+  const symptoms = document.getElementById('pSymptomsEng').value || document.getElementById('pSymptomsOrig').value;
+  if (!name || !symptoms) { alert('Please fill in patient name and symptoms.'); return; }
+
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Assessing...';
+  document.getElementById('assessResult').innerHTML = '<div class="loading"><div class="spinner"></div><span>Agent 2 assessing...</span></div>';
+
+  const patientData = {
+    name, age: document.getElementById('pAge').value,
+    village: document.getElementById('pVillage').value,
+    symptoms, duration: document.getElementById('pDuration').value,
+    notes: document.getElementById('pNotes').value,
+    symptoms_original: document.getElementById('pSymptomsOrig').value,
+    symptoms_english: document.getElementById('pSymptomsEng').value,
+    chw_name: document.getElementById('chwName').value
+  };
+
+  try {
+    const res = await fetch('/assess', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(patientData)
+    });
+    const data = await res.json();
+    if (data.error) { document.getElementById('assessResult').innerHTML = `<p style="color:red">${data.error}</p>`; return; }
+
+    currentAssessment = data;
+    currentPatient = patientData;
+    displayAssessment(data, patientData);
+
+  } catch(e) {
+    document.getElementById('assessResult').innerHTML = '<p style="color:red">Connection error.</p>';
+  }
+  btn.disabled = false;
+  btn.textContent = '🔍 Run Clinical Assessment (Agent 2)';
+}
+
+function displayAssessment(d, patient) {
+  const emergency = d.emergency_escalation ?
+    `<div class="emergency-banner">🚨 EMERGENCY — ESCALATE TO SUPERVISOR IMMEDIATELY</div>` : '';
+  const referral = d.referral_needed ? '✅ YES — Refer to clinic' : '❌ No referral needed';
+
+  document.getElementById('assessResult').innerHTML = `
+    ${emergency}
+    <span class="risk-badge ${d.risk_level}">${d.risk_level} RISK — ${patient.name}</span>
+    <div style="margin-bottom:8px;">
+      <span class="agent-tag">${d._agent}</span>
+      <span class="model-tag" style="margin-left:4px;">${d._model}</span>
+    </div>
+    <div class="result-section"><strong>Assessment</strong><p>${d.assessment}</p></div>
+    <div class="result-section"><strong>Recommended Action</strong><p>${d.action}</p></div>
+    <div class="result-section"><strong>Referral</strong><p>${referral}</p></div>
+    <div class="result-section"><strong>iCCM Protocol</strong><p>${d.iccm_protocol_applied || 'Standard iCCM'}</p></div>
+    <div class="result-section"><strong>Clinical Reasoning</strong><p>${d.reasoning}</p></div>
+    <div class="result-section"><strong>Follow-up in</strong><p>${d.follow_up_days || 3} days</p></div>
+    <div class="save-bar">
+      <button class="btn btn-sm" onclick="savePatient()">💾 Save to Registry</button>
+      ${d.emergency_escalation || d.referral_needed ?
+        `<button class="btn btn-sm btn-danger" onclick="goToEscalation()">🚨 Escalate Patient →</button>` : ''}
+    </div>`;
+}
+
+function goToEscalation() {
+  if (!currentAssessment || !currentPatient) return;
+  document.getElementById('escName').value = currentPatient.name || '';
+  document.getElementById('escAge').value = currentPatient.age || '';
+  document.getElementById('escRisk').value = currentAssessment.risk_level || 'HIGH';
+  document.getElementById('escSymptoms').value = currentPatient.symptoms || '';
+  document.getElementById('escAssessment').value = currentAssessment.assessment || '';
+  document.querySelectorAll('nav button')[2].click();
+}
+
+// ── AGENT 3: TRIAGE ────────────────────────────────────────────────────────
+function addTriagePatient() {
+  triageCount++;
+  const div = document.createElement('div');
+  div.className = 'patient-entry';
+  div.innerHTML = `<h4>Patient ${triageCount}</h4>
+    <div class="inline-2">
+      <input type="text" placeholder="Name" class="tp-name">
+      <input type="text" placeholder="Age" class="tp-age">
+    </div>
+    <textarea placeholder="Symptoms..." class="tp-symptoms" style="margin-top:8px;height:58px;"></textarea>`;
+  document.getElementById('triagePatients').appendChild(div);
+}
+
+async function runTriage() {
+  const entries = document.querySelectorAll('.patient-entry');
+  const patients = [];
+  entries.forEach(e => {
+    const name = e.querySelector('.tp-name').value;
+    const age = e.querySelector('.tp-age').value;
+    const symptoms = e.querySelector('.tp-symptoms').value;
+    if (name && symptoms) patients.push({name, age, symptoms});
+  });
+  if (patients.length === 0) { alert('Add at least one patient.'); return; }
+
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Running triage...';
+  document.getElementById('triageResult').innerHTML = `<div class="loading"><div class="spinner"></div><span>Agent 3 prioritizing ${patients.length} patients...</span></div>`;
+
+  try {
+    const res = await fetch('/triage', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({patients})
+    });
+    const data = await res.json();
+    if (data.error) { document.getElementById('triageResult').innerHTML = `<p style="color:red">${data.error}</p>`; return; }
+    displayTriage(data);
+  } catch(e) {
+    document.getElementById('triageResult').innerHTML = '<p style="color:red">Error. Check server.</p>';
+  }
+  btn.disabled = false;
+  btn.textContent = '📊 Run Triage — Prioritize Visits (Agent 3)';
+}
+
+function displayTriage(r) {
+  let html = '';
+  if (r.emergency_alert) html += `<div class="emergency-banner">🚨 ${r.emergency_alert}</div>`;
+  html += `<p style="font-size:0.85rem;color:#718096;margin-bottom:12px;">
+    ${r.priority_order.length} patients — <strong style="color:#c53030">${r.high_risk_count} HIGH risk</strong>
+    ${r.total_estimated_visit_time ? ' | Est. ' + r.total_estimated_visit_time : ''}
+  </p>`;
+  r.priority_order.forEach(p => {
+    const esc = p.emergency_escalation ? '<span class="escalate-tag">⚠️ ESCALATE</span>' : '';
+    html += `<div class="triage-item">
+      <div class="rank-circle rank-${p.risk_level}">#${p.rank}</div>
+      <div class="triage-info">
+        <h4>${p.patient_name} (${p.age}) ${esc}</h4>
+        <p>${p.risk_level} — ${p.reason}</p>
+        <p class="action">→ ${p.action}</p>
+        ${p.estimated_visit_duration ? `<p style="font-size:0.75rem;color:#a0aec0;">Est. ${p.estimated_visit_duration} mins</p>` : ''}
+      </div>
+    </div>`;
+  });
+  document.getElementById('triageResult').innerHTML = html;
+}
+
+// ── AGENT 4: ESCALATION ────────────────────────────────────────────────────
+async function runEscalation() {
+  const name = document.getElementById('escName').value;
+  const symptoms = document.getElementById('escSymptoms').value;
+  if (!name || !symptoms) { alert('Fill in patient name and symptoms.'); return; }
+
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Finding clinic...';
+  document.getElementById('escalateResult').innerHTML = `<div class="loading"><div class="spinner"></div><span>Agent 4 checking ${3} clinics...</span></div>`;
+
+  try {
+    const res = await fetch('/escalate', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        patient_name: name,
+        age: document.getElementById('escAge').value,
+        risk_level: document.getElementById('escRisk').value,
+        symptoms, assessment: document.getElementById('escAssessment').value,
+        emergency_escalation: true
+      })
+    });
+    const data = await res.json();
+    if (data.error) { document.getElementById('escalateResult').innerHTML = `<p style="color:red">${data.error}</p>`; return; }
+    currentEscalation = data;
+    displayEscalation(data);
+  } catch(e) {
+    document.getElementById('escalateResult').innerHTML = '<p style="color:red">Error.</p>';
+  }
+  btn.disabled = false;
+  btn.textContent = '🚨 Escalate — Find Clinic + Generate Referral';
+}
+
+function displayEscalation(d) {
+  const c = d.recommended_clinic || {};
+  const r = d.referral_note || {};
+  const urgencyColor = r.urgency === 'EMERGENCY' ? '#c53030' : r.urgency === 'URGENT' ? '#b7791f' : '#276749';
+
+  document.getElementById('escalateResult').innerHTML = `
+    <div class="emergency-banner">🏥 CLINIC SELECTED: ${c.name}</div>
+    <div style="margin-bottom:12px;">
+      <span class="agent-tag">${d._agent}</span>
+      <span class="model-tag" style="margin-left:4px;">${d._model}</span>
+    </div>
+    <div class="result-section"><strong>Recommended Clinic</strong>
+      <p>${c.name} — ${c.distance_km}km away | ${c.beds_available} beds available</p>
+      ${c.warnings ? `<p style="color:#b7791f;font-size:0.82rem;">⚠️ ${c.warnings}</p>` : ''}
+      <p style="font-size:0.82rem;color:#718096;">${c.reason}</p>
+    </div>
+    <div class="result-section"><strong>Referral Note</strong>
+      <div style="background:#f7fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:0.85rem;line-height:1.7;">
+        <strong>TO:</strong> ${r.to}<br>
+        <strong>PATIENT:</strong> ${r.patient_name}, Age: ${r.age}<br>
+        <strong>CONDITION:</strong> ${r.condition_summary}<br>
+        <strong>REASON:</strong> ${r.reason_for_referral}<br>
+        <strong>URGENCY:</strong> <span style="color:${urgencyColor};font-weight:700;">${r.urgency}</span><br>
+        <strong>PREPARED BY:</strong> ${r.prepared_by}<br>
+        <strong>DATE/TIME:</strong> ${d._timestamp}
+      </div>
+    </div>
+    <div class="result-section"><strong>Supervisor Alert</strong>
+      <p style="background:#fff5f5;padding:10px;border-radius:6px;border-left:3px solid #c53030;">${d.supervisor_alert}</p>
+    </div>
+    <div class="result-section"><strong>Tell the Family (Chichewa)</strong>
+      <p style="background:#f0fff4;padding:10px;border-radius:6px;border-left:3px solid #2d9b5a;font-style:italic;">"${d.chichewa_family_message}"</p>
+    </div>
+    <div class="save-bar">
+      <button class="btn btn-sm" onclick="savePatientWithEscalation()">💾 Save Full Record to Registry</button>
+    </div>`;
+}
+
+// ── SAVE TO REGISTRY ───────────────────────────────────────────────────────
+async function savePatient() {
+  if (!currentPatient || !currentAssessment) { alert('No assessment to save.'); return; }
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  try {
+    const res = await fetch('/save_patient', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({patient: currentPatient, assessment: currentAssessment, escalation: null})
+    });
+    const data = await res.json();
+    if (data.success) {
+      btn.textContent = '✅ Saved — ' + data.record_id;
+      btn.style.background = '#276749';
+    } else {
+      btn.textContent = '❌ Error saving';
+      btn.disabled = false;
+    }
+  } catch(e) {
+    btn.textContent = '❌ Error'; btn.disabled = false;
+  }
+}
+
+async function savePatientWithEscalation() {
+  if (!currentPatient || !currentAssessment || !currentEscalation) {
+    alert('Please complete assessment first, then escalate, then save.');
+    return;
+  }
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Saving full record...';
+  try {
+    const res = await fetch('/save_patient', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({patient: currentPatient, assessment: currentAssessment, escalation: currentEscalation})
+    });
+    const data = await res.json();
+    if (data.success) {
+      btn.textContent = '✅ Full Record Saved — ' + data.record_id;
+      btn.style.background = '#276749';
+    } else {
+      btn.textContent = '❌ Error'; btn.disabled = false;
+    }
+  } catch(e) {
+    btn.textContent = '❌ Error'; btn.disabled = false;
+  }
+}
+
+// ── REGISTRY ───────────────────────────────────────────────────────────────
+async function loadRegistry() {
+  document.getElementById('registryContent').innerHTML = '<div class="loading"><div class="spinner"></div><span>Loading registry...</span></div>';
+  try {
+    const res = await fetch('/registry');
+    const data = await res.json();
+    document.getElementById('registryCount').textContent = `${data.total_records} total records`;
+    if (data.records.length === 0) {
+      document.getElementById('registryContent').innerHTML = '<div class="placeholder"><span>📋</span><p>No patient records yet.<br>Assess a patient and save to registry.</p></div>';
+      return;
+    }
+    const cols = ['Record ID','Date','Time','Patient Name','Age','Village','Risk Level','Action','Referral Needed','Emergency'];
+    let html = `<div style="overflow-x:auto;"><table class="registry-table"><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr>`;
+    data.records.forEach(r => {
+      const riskColor = r['Risk Level']==='HIGH'?'#c53030':r['Risk Level']==='MEDIUM'?'#b7791f':'#276749';
+      html += `<tr>
+        <td><strong>${r['Record ID']||''}</strong></td>
+        <td>${r['Date']||''}</td><td>${r['Time']||''}</td>
+        <td><strong>${r['Patient Name']||''}</strong></td>
+        <td>${r['Age']||''}</td><td>${r['Village']||''}</td>
+        <td><strong style="color:${riskColor}">${r['Risk Level']||''}</strong></td>
+        <td style="max-width:200px;font-size:0.78rem;">${(r['Action']||'').substring(0,80)}${(r['Action']||'').length>80?'...':''}</td>
+        <td>${r['Referral Needed']||''}</td>
+        <td>${r['Emergency']||''}</td>
+      </tr>`;
+    });
+    html += '</table></div>';
+    document.getElementById('registryContent').innerHTML = html;
+  } catch(e) {
+    document.getElementById('registryContent').innerHTML = '<p style="color:red">Error loading registry.</p>';
+  }
+}
+
+// ── SUPERVISOR BRIEFING ────────────────────────────────────────────────────
+async function loadBriefing() {
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+  document.getElementById('briefingResult').innerHTML = '<div class="loading"><div class="spinner"></div><span>Agent 5 generating district briefing...</span></div>';
+  try {
+    const res = await fetch('/supervisor_briefing');
+    const data = await res.json();
+    if (data.error) { document.getElementById('briefingResult').innerHTML = `<p style="color:red">${data.error}</p>`; return; }
+    displayBriefing(data);
+  } catch(e) {
+    document.getElementById('briefingResult').innerHTML = '<p style="color:red">Error.</p>';
+  }
+  btn.disabled = false;
+  btn.textContent = '📊 Generate District Briefing';
+}
+
+function displayBriefing(d) {
+  const actions = (d.recommended_actions||[]).map(a=>`<li style="margin-bottom:6px;">${a}</li>`).join('');
+  const alerts = (d.clinic_alerts||[]).map(a=>`
+    <div style="display:flex;justify-content:space-between;padding:8px 12px;background:${a.urgency==='HIGH'?'#fff5f5':'#fffbeb'};border-radius:6px;margin-bottom:6px;">
+      <span><strong>${a.clinic}</strong> — ${a.issue}</span>
+      <span style="color:${a.urgency==='HIGH'?'#c53030':'#b7791f'};font-weight:700;">${a.urgency}</span>
+    </div>`).join('');
+
+  document.getElementById('briefingResult').innerHTML = `
+    <div class="briefing-card">
+      <h3>📊 ${d.district} District — ${d.briefing_date}</h3>
+      <p>${d.summary}</p>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="num">${d.total_active_cases||0}</div><div class="lbl">Active Cases</div></div>
+        <div class="stat-box"><div class="num" style="color:#ffcccc;">${d.critical_cases||0}</div><div class="lbl">Critical</div></div>
+        <div class="stat-box"><div class="num">${(d.clinic_alerts||[]).length}</div><div class="lbl">Clinic Alerts</div></div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card"><h2>⚠️ Clinic Alerts</h2>${alerts||'<p style="color:#718096;">No alerts</p>'}</div>
+      <div class="card"><h2>✅ Recommended Actions</h2><ul style="padding-left:18px;font-size:0.9rem;line-height:1.8;">${actions}</ul></div>
+    </div>
+    <div class="card" style="margin-top:16px;"><h2>👥 CHW Coverage</h2><p>${d.chw_coverage_status}</p></div>`;
+}
+
+// ── CLINICS ────────────────────────────────────────────────────────────────
+async function loadClinics() {
+  try {
+    const res = await fetch('/clinics');
+    const data = await res.json();
+    let html = '';
+    data.clinics.forEach(c => {
+      const bedsColor = c.beds_available===0?'stat-bad':c.beds_available<5?'stat-warn':'stat-good';
+      const bloodColor = c.blood_stock==='Empty'?'stat-bad':c.blood_stock==='Low'?'stat-warn':'stat-good';
+      html += `<div class="clinic-card">
+        <h4>🏥 ${c.name} — ${c.district}</h4>
+        <div class="clinic-stat"><span>Beds Available</span><span class="${bedsColor}">${c.beds_available}</span></div>
+        <div class="clinic-stat"><span>Blood Stock</span><span class="${bloodColor}">${c.blood_stock}</span></div>
+        <div class="clinic-stat"><span>ORS Stock</span><span>${c.ors_stock}</span></div>
+        <div class="clinic-stat"><span>Malnutrition Ward</span><span class="${c.malnutrition_ward?'stat-good':'stat-bad'}">${c.malnutrition_ward?'Yes':'No'}</span></div>
+        <div class="clinic-stat"><span>Maternity Beds</span><span>${c.maternity_beds}</span></div>
+        <div class="clinic-stat"><span>Distance</span><span>${c.distance_km} km</span></div>
+      </div>`;
+    });
+    document.getElementById('clinicsContent').innerHTML = html + `<p style="font-size:0.78rem;color:#a0aec0;margin-top:10px;">Last updated: ${data.last_updated}</p>`;
+  } catch(e) {
+    document.getElementById('clinicsContent').innerHTML = '<p style="color:red">Error loading clinics.</p>';
+  }
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+window.onload = async () => {
+  try {
+    const res = await fetch('/status');
+    const data = await res.json();
+    const allActive = Object.values(data.agents).every(v => v === 'active');
+    document.getElementById('statusDot').style.background = allActive ? '#6fcf97' : '#f6ad55';
+  } catch(e) {
+    document.getElementById('statusDot').style.background = '#c0392b';
+  }
+};
+</script>
+</body>
+</html>

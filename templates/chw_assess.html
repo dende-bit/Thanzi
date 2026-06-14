@@ -1,0 +1,445 @@
+{% extends 'base.html' %}
+{% block title %}Assess Patient{% endblock %}
+
+{% block subnav %}
+<div class="subnav">
+  <a href="{{ url_for('chw.dashboard') }}">🏠 Home</a>
+  <a href="{{ url_for('chw.register_patient') }}">➕ Register Patient</a>
+  <a href="{{ url_for('chw.assess') }}" class="active">🩺 Assess & Triage</a>
+  <a href="{{ url_for('chw.patients') }}">👥 My Patients</a>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.voice-btn{background:#1a6b3c;color:white;border:none;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1rem;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:background 0.2s;}
+.voice-btn.listening{background:#c53030;animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.1);}}
+.voice-row{display:flex;gap:8px;align-items:flex-start;}
+.voice-row textarea{flex:1;}
+.tab-btn{padding:9px 20px;border:none;background:#f0f4f8;border-radius:8px 8px 0 0;font-size:0.88rem;font-weight:600;cursor:pointer;color:#718096;}
+.tab-btn.active{background:white;color:#1a6b3c;border-bottom:2px solid #1a6b3c;}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+.result-field{margin-bottom:12px;}
+.result-field .lbl{font-size:0.72rem;font-weight:700;color:#718096;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;}
+.timeout-note{background:#fffbeb;border:1px solid #f6ad55;border-radius:8px;padding:10px 14px;font-size:0.82rem;color:#b7791f;margin-top:10px;}
+.patient-triage-card{background:#f7fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:8px;}
+.patient-triage-card:hover{border-color:#2d9b5a;background:#f0fff4;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="grid-2">
+
+<!-- LEFT: Input Panel -->
+<div class="card">
+  <div class="card-header">🩺 Patient Assessment — AI Agent</div>
+
+  <div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid #e2e8f0;">
+    <button class="tab-btn active" onclick="switchTab('tab-manual', this)">✏️ Manual Entry</button>
+    <button class="tab-btn" onclick="switchTab('tab-triage', this)">📊 Multi-Triage</button>
+  </div>
+
+  <!-- MANUAL ENTRY TAB -->
+  <div id="tab-manual" class="tab-panel active">
+    <div class="form-group">
+      <label>Select Registered Patient</label>
+      <select id="m-patient-id" onchange="fillPatientFromSelect(this)">
+        <option value="">— Select Patient —</option>
+        {% for p in patients %}
+        <option value="{{ p.national_id }}"
+                data-name="{{ p.name }}"
+                data-age="{{ p.age_months }}"
+                data-village="{{ p.village or '' }}"
+                data-symptoms="{{ p.symptoms_english or '' }}">
+          {{ p.name }} — {{ p.village or 'No village' }}
+          {% if p.risk_level %}({{ p.risk_level }}){% endif %}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="inline-2">
+      <div class="form-group">
+        <label>Patient Name</label>
+        <input type="text" id="m-name" placeholder="Full name">
+      </div>
+      <div class="form-group">
+        <label>Age</label>
+        <input type="text" id="m-age" placeholder="e.g. 8 months, 3 years">
+      </div>
+    </div>
+
+    <div class="inline-2">
+      <div class="form-group">
+        <label>Village</label>
+        <input type="text" id="m-village" placeholder="Village name">
+      </div>
+      <div class="form-group">
+        <label>Duration of Illness</label>
+        <input type="text" id="m-duration" placeholder="e.g. 3 days">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Symptoms (English or Chichewa)</label>
+      <div class="voice-row">
+        <textarea id="m-symptoms" placeholder="Describe symptoms in detail..." style="height:80px;"></textarea>
+        <button class="voice-btn" onclick="startVoice('m-symptoms', event)">🎤</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Additional Notes</label>
+      <div class="voice-row">
+        <textarea id="m-notes" placeholder="Weight, pregnancy status, MUAC, danger signs..." style="height:60px;"></textarea>
+        <button class="voice-btn" onclick="startVoice('m-notes', event)">🎤</button>
+      </div>
+    </div>
+
+    <input type="hidden" id="m-patient-id-hidden">
+
+    <button class="btn btn-primary btn-full" onclick="runManualAssess()">Run Assessment →</button>
+
+    <div class="timeout-note">⏱ Assessment takes 30–60 seconds on mobile data. Please wait after clicking.</div>
+  </div>
+
+  <!-- MULTI-TRIAGE TAB -->
+  <div id="tab-triage" class="tab-panel">
+    <p style="font-size:0.83rem;color:#718096;margin-bottom:14px;">
+      Your registered patients are listed below. Tick who to include today, update symptoms if needed, then click Prioritize.
+    </p>
+
+    {% if patients %}
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <button onclick="selectAllPatients(true)" style="padding:6px 14px;background:transparent;color:#1a6b3c;border:1px solid #1a6b3c;border-radius:6px;font-size:0.82rem;cursor:pointer;font-weight:600;">Select All</button>
+      <button onclick="selectAllPatients(false)" style="padding:6px 14px;background:transparent;color:#718096;border:1px solid #e2e8f0;border-radius:6px;font-size:0.82rem;cursor:pointer;">Clear All</button>
+    </div>
+
+    <div id="triage-patient-list">
+      {% for p in patients %}
+      <div class="patient-triage-card">
+        <div style="display:flex;align-items:flex-start;gap:10px;">
+          <input type="checkbox" class="t-checkbox"
+                 style="margin-top:5px;width:16px;height:16px;cursor:pointer;"
+                 data-name="{{ p.name }}"
+                 data-age="{{ (p.age_months // 12) }}y {{ (p.age_months % 12) }}m"
+                 data-symptoms="{{ p.symptoms_english or '' }}"
+                 data-risk="{{ p.risk_level or '' }}"
+                 data-village="{{ p.village or '' }}">
+          <div style="flex:1;">
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
+              <strong style="font-size:0.95rem;">{{ p.name }}</strong>
+              <span style="font-size:0.78rem;color:#718096;">{{ (p.age_months // 12) }}y {{ (p.age_months % 12) }}m · {{ p.village or '—' }}</span>
+              {% if p.risk_level %}<span class="risk-badge risk-{{ p.risk_level }}" style="font-size:0.7rem;padding:2px 8px;">{{ p.risk_level }}</span>{% endif %}
+            </div>
+            {% if p.symptoms_english %}
+            <div style="font-size:0.8rem;color:#4a5568;margin-top:5px;"><strong>Last symptoms:</strong> {{ p.symptoms_english[:120] }}{% if p.symptoms_english|length > 120 %}...{% endif %}</div>
+            {% endif %}
+            {% if p.timestamp %}
+            <div style="font-size:0.72rem;color:#a0aec0;margin-top:2px;">Last seen: {{ p.timestamp[:10] }}</div>
+            {% endif %}
+            <div style="margin-top:8px;">
+              <label style="font-size:0.72rem;font-weight:700;color:#718096;text-transform:uppercase;display:block;margin-bottom:3px;">Today's symptoms — update if different</label>
+              <textarea class="t-symptoms-edit" style="width:100%;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:0.82rem;height:52px;font-family:inherit;resize:vertical;">{{ p.symptoms_english or '' }}</textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="placeholder">
+      <span class="placeholder-icon">👥</span>
+      <p>No patients registered yet.<br><a href="{{ url_for('chw.register_patient') }}">Register your first patient →</a></p>
+    </div>
+    {% endif %}
+
+    <button class="btn btn-primary btn-full" style="margin-top:12px;" onclick="runTriage()">Prioritize My Visits →</button>
+    <div class="timeout-note">⏱ Triage takes 30–90 seconds depending on number of patients.</div>
+    <div id="triage-result" style="margin-top:16px;"></div>
+  </div>
+</div>
+
+<!-- RIGHT: Result Panel -->
+<div class="card" id="result-panel">
+  <div class="card-header">📋 Assessment Result</div>
+  <div id="assessment-result">
+    <div class="placeholder">
+      <span class="placeholder-icon">🩺</span>
+      <p>Run an assessment to see results here.</p>
+    </div>
+  </div>
+</div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentAssessment = null;
+
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+
+function startVoice(targetId, evt) {
+  evt.preventDefault();
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    alert('Voice input requires Chrome browser.'); return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new SR();
+  recognition.lang = 'en-US';
+  recognition.interimResults = false;
+  const btn = evt.target;
+  btn.classList.add('listening'); btn.textContent = '⏹';
+  recognition.onresult = (e) => {
+    document.getElementById(targetId).value = e.results[0][0].transcript;
+    btn.classList.remove('listening'); btn.textContent = '🎤';
+  };
+  recognition.onerror = recognition.onend = () => {
+    btn.classList.remove('listening'); btn.textContent = '🎤';
+  };
+  recognition.start();
+}
+
+function fillPatientFromSelect(sel) {
+  const opt = sel.options[sel.selectedIndex];
+  if (!opt.value) return;
+  const months = parseInt(opt.dataset.age);
+  const years = Math.floor(months / 12);
+  const rem = months % 12;
+  document.getElementById('m-name').value    = opt.dataset.name;
+  document.getElementById('m-age').value     = years + ' years ' + rem + ' months';
+  document.getElementById('m-village').value = opt.dataset.village;
+  document.getElementById('m-patient-id-hidden').value = opt.value;
+  if (opt.dataset.symptoms) document.getElementById('m-symptoms').value = opt.dataset.symptoms;
+}
+
+async function runManualAssess() {
+  const name     = document.getElementById('m-name').value.trim();
+  const symptoms = document.getElementById('m-symptoms').value.trim();
+  if (!name || !symptoms) { alert('Patient name and symptoms are required.'); return; }
+  showLoading('AI is assessing using iCCM protocol... (30–60 sec)');
+  const payload = {
+    patient_name:     name,
+    age:              document.getElementById('m-age').value,
+    village:          document.getElementById('m-village').value,
+    symptoms_english: symptoms,
+    duration:         document.getElementById('m-duration').value,
+    notes:            document.getElementById('m-notes').value
+  };
+  try {
+    const res = await fetch('/chw/api/assess', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    currentAssessment = {...data, ...payload, patient_id: document.getElementById('m-patient-id-hidden').value};
+    displayResult(data, name, payload.age, currentAssessment.patient_id);
+  } catch (e) {
+    document.getElementById('assessment-result').innerHTML = '<p style="color:#c53030;padding:20px;">Connection error. Check your internet and try again.</p>';
+  }
+}
+
+function showLoading(msg) {
+  document.getElementById('assessment-result').innerHTML =
+    `<div class="loading"><div class="spinner"></div><span>${msg || 'Loading...'}</span></div>`;
+}
+
+function displayResult(r, name, age, patientId) {
+  if (r.error) {
+    document.getElementById('assessment-result').innerHTML = `<p style="color:#c53030;padding:20px;">${r.error}</p>`;
+    return;
+  }
+  const emergency = r.emergency_escalation
+    ? '<div class="emergency-banner">🚨 ESCALATE TO SUPERVISOR IMMEDIATELY</div>' : '';
+  const saveBtn = patientId
+    ? `<button class="btn btn-primary btn-full" style="margin-top:12px;" onclick="saveEncounter('${patientId}')">💾 Save to Patient Record →</button>` : '';
+  const escalateBtn = (r.emergency_escalation || r.referral_needed)
+    ? `<button class="btn btn-secondary btn-full" style="margin-top:8px;" onclick="runEscalation()">🏥 Find Best Clinic →</button>` : '';
+  const medBtn = `<button class="btn btn-warning btn-full" style="margin-top:8px;" onclick="runMedicineRecommend()">💊 Get Medicine Recommendations →</button>`;
+
+  document.getElementById('assessment-result').innerHTML = `
+    ${emergency}
+    <span class="risk-badge risk-${r.risk_level}" style="margin-bottom:14px;display:inline-block;">
+      ${r.risk_level === 'HIGH' ? '🔴' : r.risk_level === 'MEDIUM' ? '🟡' : '🟢'}
+      ${r.risk_level} RISK — ${name}
+    </span>
+    <div class="result-field"><div class="lbl">Assessment</div><p>${r.assessment}</p></div>
+    <div class="result-field"><div class="lbl">Recommended Action</div><p>${r.action}</p></div>
+    <div class="result-field"><div class="lbl">iCCM Protocol</div><p>${r.iccm_protocol_applied || '—'}</p></div>
+    <div class="result-field"><div class="lbl">Follow-up In</div><p>${r.follow_up_days || 3} days</p></div>
+    ${r.chichewa_action_phrase ? `
+    <div style="background:#fffef0;border:1px solid #e8e0a0;border-radius:7px;padding:10px;font-style:italic;margin-bottom:10px;font-size:0.85rem;">
+      <strong style="font-style:normal;font-size:0.72rem;color:#9a8800;">🗣️ CHICHEWA — Say to family:</strong><br>"${r.chichewa_action_phrase}"
+    </div>` : ''}
+    <div style="font-size:0.72rem;color:#718096;font-style:italic;margin-bottom:10px;">${r._model || 'Microsoft Phi-4 via Azure AI Foundry'}</div>
+    ${saveBtn}${escalateBtn}${medBtn}`;
+}
+
+async function saveEncounter(patientId) {
+  if (!currentAssessment) return;
+  try {
+    const res = await fetch('/chw/api/save-encounter', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({...currentAssessment, patient_id: patientId})
+    });
+    const r = await res.json();
+    if (r.success) { alert('✅ Encounter saved to patient record.'); }
+    else { alert('❌ ' + (r.error || 'Save failed.')); }
+  } catch (e) { alert('❌ Connection error.'); }
+}
+
+async function runEscalation() {
+  if (!currentAssessment) return;
+  const box = document.getElementById('assessment-result');
+  box.innerHTML += `<div id="escalation-loading" class="loading" style="margin-top:12px;"><div class="spinner"></div><span>Finding best clinic... (30–60 sec)</span></div>`;
+  try {
+    const res = await fetch('/chw/api/escalate', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(currentAssessment)
+    });
+    const r = await res.json();
+    const loader = document.getElementById('escalation-loading');
+    if (loader) loader.remove();
+    if (r.error) { alert(r.error); return; }
+    const rec  = r.recommended_clinic || {};
+    const note = r.referral_note || {};
+    box.innerHTML += `
+      <div style="border-top:2px solid #e2e8f0;margin-top:16px;padding-top:16px;">
+        <div style="font-size:0.8rem;font-weight:700;color:#0078d4;margin-bottom:10px;">⚡ Agent 4 — Clinic Bridge (Microsoft Phi-4)</div>
+        <div style="background:#e8f5ee;border-radius:8px;padding:12px;margin-bottom:10px;">
+          <strong>🏥 ${rec.name}</strong><br>
+          <span style="font-size:0.82rem;">${rec.reason}<br>${rec.distance_km} km away · ${rec.beds_available} beds available</span>
+          ${rec.warnings ? `<br><span style="color:#b7791f;font-size:0.78rem;">⚠️ ${rec.warnings}</span>` : ''}
+        </div>
+        <div style="background:#f7fafc;border-radius:7px;padding:10px;font-family:monospace;font-size:0.78rem;margin-bottom:10px;">
+          TO: ${note.to || rec.name}<br>
+          PATIENT: ${note.patient_name || ''}, ${note.age || ''}<br>
+          URGENCY: <strong>${note.urgency || ''}</strong><br>
+          REASON: ${note.reason_for_referral || ''}
+        </div>
+        <div style="background:#fffef0;border:1px solid #e8e0a0;border-radius:7px;padding:10px;font-style:italic;font-size:0.85rem;">
+          🗣️ "${r.chichewa_family_message || ''}"
+        </div>
+      </div>`;
+  } catch (e) {
+    const loader = document.getElementById('escalation-loading');
+    if (loader) loader.remove();
+    alert('❌ Connection error finding clinic.');
+  }
+}
+
+async function runMedicineRecommend() {
+  if (!currentAssessment) return;
+  const box = document.getElementById('assessment-result');
+  box.innerHTML += `<div id="med-loading" class="loading" style="margin-top:12px;"><div class="spinner"></div><span>Checking your stock and generating recommendations... (30–60 sec)</span></div>`;
+  try {
+    const res = await fetch('/chw/api/medicine-recommend', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(currentAssessment)
+    });
+    const r = await res.json();
+    const loader = document.getElementById('med-loading');
+    if (loader) loader.remove();
+    if (r.error) { alert('❌ ' + r.error); return; }
+
+    let html = '<div style="border-top:2px solid #e2e8f0;margin-top:16px;padding-top:16px;">';
+    html += '<div style="font-size:0.8rem;font-weight:700;color:#b7791f;margin-bottom:10px;">💊 Agent 7 — Medicine Recommendations (Microsoft Phi-4)</div>';
+
+    if (r.refer_due_to_stock) {
+      html += `<div class="emergency-banner" style="background:#b7791f;">⚠️ Refer patient — ${r.referral_reason}</div>`;
+    }
+
+    (r.stock_warnings || []).forEach(w => {
+      html += `<div style="background:#fffbeb;border:1px solid #f6ad55;border-radius:6px;padding:8px 10px;margin-bottom:6px;font-size:0.82rem;color:#b7791f;">⚠️ ${w}</div>`;
+    });
+
+    (r.recommendations || []).forEach(m => {
+      html += `
+        <div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:8px;background:${m.sufficient ? '#f0fff4' : '#fff5f5'};">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong>${m.medicine}</strong>
+            <span style="font-size:0.75rem;color:${m.sufficient ? '#276749' : '#c53030'};font-weight:700;">
+              ${m.units_available} units available
+            </span>
+          </div>
+          <span style="font-size:0.82rem;color:#4a5568;">${m.dose} · ${m.frequency} · ${m.duration}</span>
+          ${!m.sufficient ? '<br><span style="font-size:0.75rem;color:#c53030;font-weight:700;">⚠️ Insufficient stock — consider referral</span>' : ''}
+        </div>`;
+    });
+
+    if (r.general_advice) {
+      html += `<div style="background:#e8f0fe;border-radius:7px;padding:10px;font-size:0.82rem;margin-top:6px;color:#2c5282;">${r.general_advice}</div>`;
+    }
+
+    html += '</div>';
+    box.innerHTML += html;
+  } catch (e) {
+    const loader = document.getElementById('med-loading');
+    if (loader) loader.remove();
+    alert('❌ Connection error getting recommendations.');
+  }
+}
+
+function selectAllPatients(checked) {
+  document.querySelectorAll('.t-checkbox').forEach(cb => cb.checked = checked);
+}
+
+async function runTriage() {
+  const checkboxes = document.querySelectorAll('.t-checkbox:checked');
+  if (!checkboxes.length) { alert('Tick at least one patient to triage.'); return; }
+  const patients = [];
+  checkboxes.forEach(cb => {
+    const card = cb.closest('.patient-triage-card');
+    const symEdit = card ? card.querySelector('.t-symptoms-edit') : null;
+    const symptoms = symEdit && symEdit.value.trim() ? symEdit.value.trim() : (cb.dataset.symptoms || 'No symptoms recorded');
+    patients.push({ name: cb.dataset.name, age: cb.dataset.age, symptoms, village: cb.dataset.village, last_risk: cb.dataset.risk });
+  });
+
+  document.getElementById('triage-result').innerHTML =
+    `<div class="loading"><div class="spinner"></div><span>Prioritizing ${patients.length} patients... (30–90 sec)</span></div>`;
+
+  try {
+    const res = await fetch('/chw/api/triage', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({patients})
+    });
+    const r = await res.json();
+    if (r.error) { document.getElementById('triage-result').innerHTML = `<p style="color:#c53030">${r.error}</p>`; return; }
+
+    let html = r.emergency_alert ? `<div class="emergency-banner">🚨 ${r.emergency_alert}</div>` : '';
+    html += `<p style="font-size:0.82rem;color:#718096;margin-bottom:12px;">${r.priority_order.length} patients triaged · <strong style="color:#c53030;">${r.high_risk_count} HIGH risk</strong></p>`;
+
+    (r.priority_order || []).forEach(p => {
+      const color = p.risk_level === 'HIGH' ? '#c53030' : p.risk_level === 'MEDIUM' ? '#b7791f' : '#276749';
+      html += `
+        <div style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:8px;background:white;">
+          <div style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;flex-shrink:0;background:#f7fafc;border:2px solid ${color};color:${color};">#${p.rank}</div>
+          <div>
+            <strong>${p.patient_name}</strong> (${p.age})
+            ${p.emergency_escalation ? '<span style="background:#c53030;color:white;font-size:0.65rem;padding:1px 6px;border-radius:4px;margin-left:4px;">ESCALATE</span>' : ''}
+            <br><span style="font-size:0.8rem;color:#718096;">${p.risk_level} · ${p.reason}</span>
+            <br><span style="font-size:0.82rem;">→ ${p.action}</span>
+            ${p.estimated_visit_minutes ? `<br><span style="font-size:0.75rem;color:#718096;">⏱ Est. ${p.estimated_visit_minutes} min visit</span>` : ''}
+          </div>
+        </div>`;
+    });
+
+    if (r.schedule_note) {
+      html += `<div style="background:#e8f0fe;border-radius:7px;padding:10px;font-size:0.82rem;color:#2c5282;margin-top:4px;">📅 ${r.schedule_note}</div>`;
+    }
+
+    document.getElementById('triage-result').innerHTML = html;
+  } catch (e) {
+    document.getElementById('triage-result').innerHTML = '<p style="color:#c53030">Connection error. Try again.</p>';
+  }
+}
+</script>
+{% endblock %}

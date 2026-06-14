@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% block title %}Register Worker{% endblock %}
+
+{% block subnav %}
+<div class="subnav">
+  <a href="{{ url_for('admin.dashboard') }}">📊 Overview</a>
+  <a href="{{ url_for('admin.register_worker') }}" class="active">➕ Register Worker</a>
+  <a href="{{ url_for('admin.list_workers') }}">👥 All Workers</a>
+  <a href="{{ url_for('admin.facilities') }}">🏥 Facilities</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:600px;margin:0 auto;">
+  <div class="card">
+    <div class="card-header">➕ Register New Health Worker</div>
+
+    {% if error %}
+    <div class="emergency-banner" style="margin-bottom:16px;">⛔ {{ error }}</div>
+    {% endif %}
+
+    {% if success %}
+    <div style="background:#e8f5ee;color:#1a6b3c;border:1px solid #68d391;
+                border-radius:8px;padding:12px 16px;margin-bottom:16px;
+                font-weight:600;display:flex;align-items:center;gap:8px;">
+      ✅ {{ success }}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('admin.register_worker') }}">
+
+      <div class="form-group">
+        <label>Full Name *</label>
+        <input type="text" name="full_name" placeholder="e.g. Grace Phiri"
+               required autofocus>
+      </div>
+
+      <div class="inline-2">
+        <div class="form-group">
+          <label>Username *</label>
+          <input type="text" name="username"
+                 placeholder="e.g. grace.phiri" required
+                 pattern="[a-zA-Z0-9._]+"
+                 title="Letters, numbers, dots, and underscores only">
+        </div>
+        <div class="form-group">
+          <label>Password * (min 8 chars)</label>
+          <input type="password" name="password"
+                 placeholder="Minimum 8 characters" required minlength="8">
+        </div>
+      </div>
+
+      <div class="inline-2">
+        <div class="form-group">
+          <label>Role *</label>
+          <select name="role" required>
+            <option value="">— Select Role —</option>
+            <option value="CHW">CHW — Community Health Worker</option>
+            <option value="SUPERVISOR">SUPERVISOR — Field Supervisor</option>
+            <option value="DHO">DHO — District Health Officer</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Assigned Facility</label>
+          <select name="facility_id">
+            <option value="">— No Facility —</option>
+            {% for f in facilities %}
+            <option value="{{ f.id }}">{{ f.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Catchment Area / Zone</label>
+        <input type="text" name="catchment_area"
+               placeholder="e.g. Lilongwe North — Zone A, Mtendere Village">
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-full"
+              style="margin-top:6px;">
+        Register Worker →
+      </button>
+
+    </form>
+  </div>
+
+  <div class="card" style="margin-top:16px;">
+    <div class="card-header">ℹ️ Role Permissions</div>
+    <table class="data-table">
+      <thead>
+        <tr><th>Role</th><th>Access Level</th><th>Key Capabilities</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>CHW</strong></td>
+          <td>Tier 1 — Field</td>
+          <td>Patient registration, voice intake, assessment, triage, escalation</td>
+        </tr>
+        <tr>
+          <td><strong>SUPERVISOR</strong></td>
+          <td>Tier 2 — District</td>
+          <td>CHW oversight, case review, escalation handling, morning briefings</td>
+        </tr>
+        <tr>
+          <td><strong>DHO</strong></td>
+          <td>Tier 3 — Command</td>
+          <td>District intelligence, strategic reports, facility management, trends</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

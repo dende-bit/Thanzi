@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div style="text-align:center;padding:80px 20px;">
+  <div style="font-size:3rem;margin-bottom:16px;">🔧</div>
+  <h2 style="color:#1a6b3c;font-size:1.5rem;margin-bottom:10px;">{{ title }}</h2>
+  <p style="color:#718096;font-size:0.95rem;">{{ message }}</p>
+  <a href="{{ url_for('auth.logout') }}"
+     style="display:inline-block;margin-top:24px;padding:10px 24px;background:#1a6b3c;color:white;border-radius:8px;text-decoration:none;font-weight:700;">
+    Sign Out
+  </a>
+</div>
+{% endblock %}

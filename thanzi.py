@@ -1,7 +1,12 @@
-from groq import Groq
-
+from openai import OpenAI
 import os
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+
+# Microsoft Phi-4 via Azure AI Foundry (GitHub Models free tier)
+github_token = os.environ.get("GITHUB_TOKEN")
+client = OpenAI(
+    base_url="https://models.inference.ai.azure.com",
+    api_key=github_token,
+)
 
 system_prompt = """You are Thanzi, an AI health agent for Community Health Workers (CHWs) 
 in Malawi. You help CHWs assess patient risk, prioritize home visits, coordinate referrals 
@@ -26,27 +31,36 @@ CHICHEWA SUMMARY: (translate key advice to Chichewa)"""
 conversation_history = []
 
 def chat_with_thanzi(user_message):
+    if not github_token:
+        return "❌ GITHUB_TOKEN not set. Run: export GITHUB_TOKEN=your_token"
+
     conversation_history.append({
-        "role": "user", 
+        "role": "user",
         "content": user_message
     })
-    
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "system", "content": system_prompt}] + conversation_history
-    )
-    
-    assistant_message = response.choices[0].message.content
-    conversation_history.append({
-        "role": "assistant",
-        "content": assistant_message
-    })
-    
-    return assistant_message
+
+    try:
+        response = client.chat.completions.create(
+            model="Phi-4",
+            messages=[{"role": "system", "content": system_prompt}] + conversation_history,
+            max_tokens=1000,
+        )
+
+        assistant_message = response.choices[0].message.content
+        conversation_history.append({
+            "role": "assistant",
+            "content": assistant_message
+        })
+        return assistant_message
+
+    except Exception as e:
+        return f"❌ Error: {e}"
+
 
 print("=" * 50)
 print("   THANZI - Community Health Agent")
 print("   Serving Malawi's Community Health Workers")
+print("   Powered by Microsoft Phi-4 (Azure AI Foundry)")
 print("=" * 50)
 print("Type your patient case below. Type 'exit' to quit.")
 print()

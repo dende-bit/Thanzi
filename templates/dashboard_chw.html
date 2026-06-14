@@ -1,0 +1,257 @@
+{% extends 'base.html' %}
+{% block title %}CHW Dashboard{% endblock %}
+
+{% block subnav %}
+<div class="subnav">
+  <a href="{{ url_for('chw.dashboard') }}" class="active">🏠 Home</a>
+  <a href="{{ url_for('chw.register_patient') }}">➕ Register Patient</a>
+  <a href="{{ url_for('chw.assess') }}">🩺 Assess & Triage</a>
+  <a href="{{ url_for('chw.patients') }}">👥 My Patients</a>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.voice-btn {
+  background: #1a6b3c; color: white; border: none;
+  border-radius: 50%; width: 36px; height: 36px;
+  cursor: pointer; font-size: 1rem; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s;
+}
+.voice-btn.listening { background: #c53030; animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.1);} }
+.voice-row { display: flex; gap: 8px; align-items: flex-start; }
+.voice-row input, .voice-row textarea { flex: 1; }
+.followup-urgent { border-left: 4px solid #c53030 !important; }
+.followup-today  { border-left: 4px solid #f6ad55 !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Stats -->
+<div class="grid-4" style="margin-bottom:20px;">
+  <div class="stat-box">
+    <div class="stat-num">{{ total_patients }}</div>
+    <div class="stat-lbl">My Patients</div>
+  </div>
+  <div class="stat-box red">
+    <div class="stat-num">{{ high_risk_open }}</div>
+    <div class="stat-lbl">Open HIGH Risk</div>
+  </div>
+  <div class="stat-box amber">
+    <div class="stat-num">{{ pending_followups | length }}</div>
+    <div class="stat-lbl">Follow-ups Due</div>
+  </div>
+  <div class="stat-box blue">
+    <div class="stat-num">{{ today_encounters }}</div>
+    <div class="stat-lbl">Today's Encounters</div>
+  </div>
+</div>
+
+<div class="grid-2">
+
+<!-- Follow-ups Due -->
+<div class="card">
+  <div class="card-header">⏰ Follow-ups Due Today</div>
+  {% if pending_followups %}
+    {% for f in pending_followups %}
+    <div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:8px;"
+         class="{% if f.risk_level == 'HIGH' %}followup-urgent{% else %}followup-today{% endif %}">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <strong>{{ f.name }}</strong>
+        <span class="risk-badge risk-{{ f.risk_level }}">{{ f.risk_level }}</span>
+      </div>
+      <div style="font-size:0.8rem;color:#718096;margin-top:3px;">
+        📍 {{ f.village }} &nbsp;|&nbsp; Follow-up: {{ f.followup_date }}
+      </div>
+      <div style="font-size:0.82rem;margin-top:5px;">→ {{ f.recommended_action[:80] }}</div>
+      <button onclick="closeEncounter({{ f.id }}, this)"
+              style="margin-top:8px;padding:4px 12px;background:#276749;color:white;border:none;border-radius:6px;font-size:0.78rem;cursor:pointer;">
+        Mark Visited ✓
+      </button>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="placeholder">
+      <span class="placeholder-icon">✅</span>
+      <p>No follow-ups due today.</p>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Medicine Stock -->
+<div class="card">
+  <div class="card-header">💊 Medicine Stock Report</div>
+  {% if last_stock %}
+  <p style="font-size:0.78rem;color:#718096;margin-bottom:12px;">
+    Last reported: {{ last_stock.reported_at[:16] }}
+  </p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+    {% for item, label in [('ors','ORS Sachets'),('paracetamol','Paracetamol'),('amoxicillin','Amoxicillin'),('malaria_rdt','Malaria RDTs'),('zinc','Zinc Tablets')] %}
+    <div style="background:#f7fafc;border-radius:6px;padding:8px 10px;font-size:0.82rem;">
+      <strong>{{ label }}</strong><br>
+      <span style="font-size:1.1rem;font-weight:700;color:{% if last_stock[item] < 5 %}#c53030{% elif last_stock[item] < 15 %}#b7791f{% else %}#276749{% endif %};">
+        {{ last_stock[item] }}
+      </span> units
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Voice input for stock -->
+  <div style="background:#e8f5ee;border-radius:8px;padding:12px;margin-bottom:12px;font-size:0.82rem;color:#1a6b3c;">
+    🎤 <strong>Speak your stock levels</strong> — e.g. "ORS 20, paracetamol 8, malaria RDT 5"
+  </div>
+  <div class="voice-row" style="margin-bottom:10px;">
+    <textarea id="stock-voice-text" placeholder="Or type: ORS 20, paracetamol 8, RDT 5, amoxicillin 12..." style="height:60px;"></textarea>
+    <button class="voice-btn" onclick="startVoice('stock-voice-text', parseStockFromText)">🎤</button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <div class="form-group" style="margin:0;"><label>ORS</label><input type="number" id="s-ors" placeholder="0" min="0"></div>
+    <div class="form-group" style="margin:0;"><label>Paracetamol</label><input type="number" id="s-para" placeholder="0" min="0"></div>
+    <div class="form-group" style="margin:0;"><label>Amoxicillin</label><input type="number" id="s-amox" placeholder="0" min="0"></div>
+    <div class="form-group" style="margin:0;"><label>Malaria RDT</label><input type="number" id="s-rdt" placeholder="0" min="0"></div>
+    <div class="form-group" style="margin:0;"><label>Zinc</label><input type="number" id="s-zinc" placeholder="0" min="0"></div>
+  </div>
+  <button class="btn btn-primary btn-full" style="margin-top:10px;" onclick="submitStock()">Report Stock →</button>
+  <div id="stock-msg" style="margin-top:8px;font-size:0.82rem;"></div>
+</div>
+
+</div>
+
+<!-- Recent Encounters -->
+<div class="card">
+  <div class="card-header" style="justify-content:space-between;">
+    <span>📋 Recent Encounters</span>
+    <a href="{{ url_for('chw.assess') }}" class="btn btn-primary btn-sm">+ New Assessment</a>
+  </div>
+  {% if recent_encounters %}
+  <table class="data-table">
+    <thead>
+      <tr><th>Patient</th><th>Village</th><th>Risk</th><th>Action</th><th>Referral</th><th>Date</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      {% for e in recent_encounters %}
+      <tr>
+        <td><strong>{{ e.name }}</strong></td>
+        <td>{{ e.village }}</td>
+        <td><span class="risk-badge risk-{{ e.risk_level }}">{{ e.risk_level }}</span></td>
+        <td style="font-size:0.8rem;max-width:200px;">{{ e.recommended_action[:60] }}{% if e.recommended_action|length > 60 %}...{% endif %}</td>
+        <td>{% if e.referral_needed %}<span style="color:#c53030;font-weight:700;">Yes{% if e.facility_name %} → {{ e.facility_name[:20] }}{% endif %}</span>{% else %}No{% endif %}</td>
+        <td style="font-size:0.78rem;color:#718096;">{{ e.timestamp[:10] }}</td>
+        <td>{% if e.record_closed %}<span style="color:#718096;">Closed</span>{% else %}<span style="color:#276749;font-weight:600;">Open</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="placeholder">
+    <span class="placeholder-icon">🩺</span>
+    <p>No encounters yet. <a href="{{ url_for('chw.assess') }}">Start your first assessment →</a></p>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Voice Input Engine ──────────────────────────────────────────────────
+let activeRecognition = null;
+
+function startVoice(targetId, callback) {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    alert('Voice input is not supported in this browser. Use Chrome on Android or desktop.');
+    return;
+  }
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'en-US';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  const btn = event.target;
+  btn.classList.add('listening');
+  btn.textContent = '⏹';
+
+  recognition.onresult = (e) => {
+    const transcript = e.results[0][0].transcript;
+    document.getElementById(targetId).value = transcript;
+    btn.classList.remove('listening');
+    btn.textContent = '🎤';
+    if (callback) callback(transcript);
+  };
+
+  recognition.onerror = () => {
+    btn.classList.remove('listening');
+    btn.textContent = '🎤';
+  };
+
+  recognition.onend = () => {
+    btn.classList.remove('listening');
+    btn.textContent = '🎤';
+  };
+
+  recognition.start();
+  activeRecognition = recognition;
+}
+
+// ── Stock Parser ────────────────────────────────────────────────────────
+function parseStockFromText(text) {
+  const t = text.toLowerCase();
+  const extract = (keys) => {
+    for (const k of keys) {
+      const m = t.match(new RegExp(k + '[\\s:]*([0-9]+)'));
+      if (m) return m[1];
+    }
+    return '';
+  };
+  document.getElementById('s-ors').value   = extract(['ors','oral rehydration']);
+  document.getElementById('s-para').value  = extract(['paracetamol','panadol','para']);
+  document.getElementById('s-amox').value  = extract(['amoxicillin','amox','antibiotic']);
+  document.getElementById('s-rdt').value   = extract(['rdt','malaria rdt','malaria test','rapid test']);
+  document.getElementById('s-zinc').value  = extract(['zinc']);
+}
+
+// ── Submit Stock ────────────────────────────────────────────────────────
+async function submitStock() {
+  const payload = {
+    ors:         parseInt(document.getElementById('s-ors').value)  || 0,
+    paracetamol: parseInt(document.getElementById('s-para').value) || 0,
+    amoxicillin: parseInt(document.getElementById('s-amox').value) || 0,
+    malaria_rdt: parseInt(document.getElementById('s-rdt').value)  || 0,
+    zinc:        parseInt(document.getElementById('s-zinc').value) || 0,
+    notes:       document.getElementById('stock-voice-text').value
+  };
+  const res = await fetch('/chw/api/report-stock', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  });
+  const r = await res.json();
+  const msg = document.getElementById('stock-msg');
+  if (r.success) {
+    msg.style.color = '#276749';
+    msg.textContent = '✅ Stock reported successfully.';
+    setTimeout(() => location.reload(), 1500);
+  } else {
+    msg.style.color = '#c53030';
+    msg.textContent = '❌ ' + (r.error || 'Failed.');
+  }
+}
+
+// ── Close Encounter ─────────────────────────────────────────────────────
+async function closeEncounter(id, btn) {
+  if (!confirm('Mark this patient as visited and close the follow-up?')) return;
+  const res = await fetch(`/chw/api/close-encounter/${id}`, {method:'POST'});
+  const r = await res.json();
+  if (r.success) {
+    btn.closest('div[style]').style.opacity = '0.4';
+    btn.textContent = '✓ Closed';
+    btn.disabled = true;
+  }
+}
+</script>
+{% endblock %}

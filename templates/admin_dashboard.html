@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block subnav %}
+<div class="subnav">
+  <a href="{{ url_for('admin.dashboard') }}" class="active">📊 Overview</a>
+  <a href="{{ url_for('admin.register_worker') }}">➕ Register Worker</a>
+  <a href="{{ url_for('admin.list_workers') }}">👥 All Workers</a>
+  <a href="{{ url_for('admin.facilities') }}">🏥 Facilities</a>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Stat Row ── -->
+<div class="grid-4" style="margin-bottom:20px;">
+  <div class="stat-box">
+    <div class="stat-num">{{ stats.total_chws }}</div>
+    <div class="stat-lbl">Active CHWs</div>
+  </div>
+  <div class="stat-box red">
+    <div class="stat-num">{{ stats.high_risk }}</div>
+    <div class="stat-lbl">High Risk Cases</div>
+  </div>
+  <div class="stat-box amber">
+    <div class="stat-num">{{ stats.total_referrals }}</div>
+    <div class="stat-lbl">Total Referrals</div>
+  </div>
+  <div class="stat-box blue">
+    <div class="stat-num">{{ stats.total_patients }}</div>
+    <div class="stat-lbl">Registered Patients</div>
+  </div>
+</div>
+
+<div class="grid-2">
+
+  <!-- ── System Summary ── -->
+  <div class="card">
+    <div class="card-header">📋 System Summary</div>
+    <table class="data-table">
+      <tr><td>Total Health Workers</td><td><strong>{{ stats.total_users }}</strong></td></tr>
+      <tr><td>Community Health Workers</td><td><strong>{{ stats.total_chws }}</strong></td></tr>
+      <tr><td>Supervisors</td><td><strong>{{ stats.total_supervisors }}</strong></td></tr>
+      <tr><td>District Health Officers</td><td><strong>{{ stats.total_dhos }}</strong></td></tr>
+      <tr><td>Total Patients Registered</td><td><strong>{{ stats.total_patients }}</strong></td></tr>
+      <tr><td>Total Encounters</td><td><strong>{{ stats.total_encounters }}</strong></td></tr>
+      <tr><td>High Risk Encounters</td>
+          <td><strong style="color:#c53030;">{{ stats.high_risk }}</strong></td></tr>
+      <tr><td>Referrals Generated</td><td><strong>{{ stats.total_referrals }}</strong></td></tr>
+    </table>
+  </div>
+
+  <!-- ── Facility Status ── -->
+  <div class="card">
+    <div class="card-header">🏥 Facility Capacity</div>
+    {% for f in facilities %}
+    <div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:10px;">
+      <div style="font-weight:700;color:#2d3748;margin-bottom:6px;">{{ f.name }}</div>
+      <div style="display:flex;gap:16px;font-size:0.82rem;flex-wrap:wrap;">
+        <span>🛏 Beds:
+          <strong style="color:{% if f.beds_available == 0 %}#c53030{% elif f.beds_available < 5 %}#b7791f{% else %}#276749{% endif %};">
+            {{ f.beds_available }}
+          </strong>
+        </span>
+        <span>🩸 Blood:
+          <strong style="color:{% if f.blood_stock == 'Empty' %}#c53030{% elif f.blood_stock == 'Low' %}#b7791f{% else %}#276749{% endif %};">
+            {{ f.blood_stock }}
+          </strong>
+        </span>
+        <span>🤰 Maternity: <strong>{{ f.maternity_beds }}</strong></span>
+        <span>Status:
+          <strong style="color:{% if f.status == 'ACTIVE' %}#276749{% else %}#c53030{% endif %};">
+            {{ f.status }}
+          </strong>
+        </span>
+      </div>
+    </div>
+    {% endfor %}
+    <a href="{{ url_for('admin.facilities') }}"
+       class="btn btn-secondary btn-sm" style="margin-top:4px;">
+      Manage Facilities →
+    </a>
+  </div>
+
+</div>
+
+<!-- ── Recent Workers ── -->
+<div class="card">
+  <div class="card-header" style="justify-content:space-between;">
+    <span>👥 Recently Registered Workers</span>
+    <a href="{{ url_for('admin.register_worker') }}"
+       class="btn btn-primary btn-sm">+ Register New Worker</a>
+  </div>
+  {% if recent_users %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Full Name</th><th>Username</th><th>Role</th>
+        <th>Catchment Area</th><th>Facility</th>
+        <th>Status</th><th>Registered</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in recent_users %}
+      <tr>
+        <td><strong>{{ u.full_name }}</strong></td>
+        <td>{{ u.username }}</td>
+        <td><span class="risk-badge risk-{% if u.role == 'CHW' %}LOW{% elif u.role == 'SUPERVISOR' %}MEDIUM{% else %}HIGH{% endif %}">
+          {{ u.role }}</span></td>
+        <td>{{ u.catchment_area or '—' }}</td>
+        <td>{{ u.facility_name or '—' }}</td>
+        <td><span style="color:{% if u.status == 'ACTIVE' %}#276749{% else %}#c53030{% endif %};font-weight:700;">
+          {{ u.status }}</span></td>
+        <td style="font-size:0.8rem;color:#718096;">{{ u.created_at[:10] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="placeholder">
+    <span class="placeholder-icon">👥</span>
+    <p>No workers registered yet.<br>
+    <a href="{{ url_for('admin.register_worker') }}">Register the first worker →</a></p>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

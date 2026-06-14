@@ -1,0 +1,401 @@
+{% extends 'base.html' %}
+{% block title %}Supervisor Dashboard{% endblock %}
+
+{% block subnav %}
+<div class="subnav">
+  <a href="{{ url_for('supervisor.dashboard') }}" class="active">📊 Overview</a>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.case-card{border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:14px;background:white;}
+.case-card.high{border-left:4px solid #c53030;}
+.case-card.medium{border-left:4px solid #f6ad55;}
+.case-card.low{border-left:4px solid #68d391;}
+.feedback-box{width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:7px;
+              font-size:0.85rem;font-family:inherit;margin-top:8px;height:60px;resize:vertical;}
+.feedback-box:focus{outline:none;border-color:#2d9b5a;}
+.chw-row{display:flex;align-items:center;justify-content:space-between;
+         padding:10px 14px;border-bottom:1px solid #f0f4f8;}
+.chw-row:last-child{border-bottom:none;}
+.activity-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;}
+.active-dot{background:#2d9b5a;}
+.inactive-dot{background:#e2e8f0;}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Stat Row ── -->
+<div class="grid-4" style="margin-bottom:20px;">
+  <div class="stat-box red">
+    <div class="stat-num">{{ stats.high_risk }}</div>
+    <div class="stat-lbl">Open HIGH Risk</div>
+  </div>
+  <div class="stat-box amber">
+    <div class="stat-num">{{ stats.escalated_pending }}</div>
+    <div class="stat-lbl">Awaiting Feedback</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-num">{{ stats.new_today }}</div>
+    <div class="stat-lbl">New Today</div>
+  </div>
+  <div class="stat-box blue">
+    <div class="stat-num">{{ stats.active_chws }}</div>
+    <div class="stat-lbl">Active CHWs</div>
+  </div>
+</div>
+
+<!-- ── AI Morning Briefing ── -->
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-header" style="justify-content:space-between;">
+    <span>🤖 AI District Briefing — Microsoft Phi-4</span>
+    <button class="btn btn-primary btn-sm" onclick="loadBriefing()">
+      Generate Morning Briefing →
+    </button>
+  </div>
+  <div id="briefing-result">
+    <div class="placeholder">
+      <span class="placeholder-icon">📋</span>
+      <p>Click Generate Morning Briefing to get today's AI district summary.</p>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+
+<!-- ── Escalated Cases ── -->
+<div class="card">
+  <div class="card-header">🚨 Escalated Cases — Awaiting Your Feedback</div>
+  {% if escalated_cases %}
+    {% for e in escalated_cases %}
+    <div class="case-card {{ e.risk_level | lower }}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;
+                  flex-wrap:wrap;gap:6px;">
+        <div>
+          <strong>{{ e.patient_name }}</strong>
+          <span style="font-size:0.78rem;color:#718096;margin-left:8px;">
+            {{ (e.age_months // 12) }}y · {{ e.village }}
+          </span>
+          <span class="risk-badge risk-{{ e.risk_level }}"
+                style="margin-left:8px;font-size:0.72rem;">
+            {{ e.risk_level }}
+          </span>
+        </div>
+        <span style="font-size:0.75rem;color:#a0aec0;">
+          {{ e.timestamp[:16] }}
+        </span>
+      </div>
+
+      <div style="font-size:0.82rem;color:#4a5568;margin-top:8px;">
+        <strong>CHW:</strong> {{ e.chw_name }}<br>
+        <strong>Symptoms:</strong> {{ e.symptoms_english[:100] }}
+        {% if e.symptoms_english|length > 100 %}...{% endif %}<br>
+        <strong>Assessment:</strong> {{ e.assessment_notes[:100] }}
+        {% if e.assessment_notes|length > 100 %}...{% endif %}<br>
+        {% if e.facility_name %}
+        <strong>Referred to:</strong> {{ e.facility_name }}
+        ({{ e.referral_urgency }})
+        {% endif %}
+      </div>
+
+      <textarea class="feedback-box" id="feedback-{{ e.id }}"
+                placeholder="Type your feedback or action taken..."></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn btn-primary btn-sm"
+                onclick="submitFeedback({{ e.id }})">
+          Submit Feedback ✓
+        </button>
+        <button class="btn btn-warning btn-sm"
+                onclick="closeCase({{ e.id }})">
+          Close Case
+        </button>
+      </div>
+      <div id="feedback-msg-{{ e.id }}"
+           style="font-size:0.78rem;margin-top:6px;"></div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="placeholder">
+      <span class="placeholder-icon">✅</span>
+      <p>No escalated cases awaiting feedback.</p>
+    </div>
+  {% endif %}
+</div>
+
+<!-- ── RIGHT COLUMN ── -->
+<div>
+
+  <!-- CHW Activity -->
+  <div class="card" style="margin-bottom:20px;">
+    <div class="card-header">👥 CHW Field Activity</div>
+    {% if chw_activity %}
+      {% for c in chw_activity %}
+      <div class="chw-row">
+        <div>
+          <span class="activity-dot
+            {% if c.today_encounters > 0 %}active-dot{% else %}inactive-dot{% endif %}">
+          </span>
+          <strong>{{ c.full_name }}</strong>
+          <span style="font-size:0.78rem;color:#718096;margin-left:6px;">
+            {{ c.catchment_area or '—' }}
+          </span>
+        </div>
+        <div style="text-align:right;font-size:0.82rem;">
+          <span style="color:#2d9b5a;font-weight:700;">
+            {{ c.today_encounters }} today
+          </span>
+          <span style="color:#718096;margin-left:8px;">
+            {{ c.total_encounters }} total
+          </span>
+          {% if c.high_risk_count > 0 %}
+          <span style="color:#c53030;margin-left:8px;font-weight:700;">
+            {{ c.high_risk_count }} HIGH
+          </span>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="placeholder">
+        <span class="placeholder-icon">👥</span>
+        <p>No CHWs registered yet.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Facility Capacity -->
+  <div class="card">
+    <div class="card-header">🏥 Facility Capacity</div>
+    {% for f in facilities %}
+    <div style="border:1px solid #e2e8f0;border-radius:8px;
+                padding:10px 14px;margin-bottom:8px;">
+      <div style="font-weight:700;font-size:0.9rem;margin-bottom:4px;">
+        {{ f.name }}
+      </div>
+      <div style="display:flex;gap:14px;font-size:0.8rem;flex-wrap:wrap;">
+        <span>🛏
+          <strong style="color:
+            {% if f.beds_available == 0 %}#c53030
+            {% elif f.beds_available < 5 %}#b7791f
+            {% else %}#276749{% endif %};">
+            {{ f.beds_available }} beds
+          </strong>
+        </span>
+        <span>🩸
+          <strong style="color:
+            {% if f.blood_stock == 'Empty' %}#c53030
+            {% elif f.blood_stock == 'Low' %}#b7791f
+            {% else %}#276749{% endif %};">
+            {{ f.blood_stock }}
+          </strong>
+        </span>
+        <span>🤰 {{ f.maternity_beds }} maternity</span>
+        <span style="color:
+          {% if f.status == 'ACTIVE' %}#276749
+          {% else %}#c53030{% endif %};font-weight:600;">
+          {{ f.status }}
+        </span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+</div>
+
+<!-- ── Recent HIGH Risk ── -->
+<div class="card" style="margin-top:0;">
+  <div class="card-header">🔴 Recent HIGH Risk Encounters</div>
+  {% if recent_high_risk %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Patient</th><th>Village</th><th>Age</th>
+        <th>CHW</th><th>Symptoms</th><th>Action</th>
+        <th>Referral</th><th>Date</th><th>Close</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in recent_high_risk %}
+      <tr>
+        <td><strong>{{ e.patient_name }}</strong></td>
+        <td>{{ e.village }}</td>
+        <td>{{ e.age_months // 12 }}y</td>
+        <td>{{ e.chw_name }}</td>
+        <td style="font-size:0.78rem;max-width:160px;">
+          {{ e.symptoms_english[:60] }}
+          {% if e.symptoms_english|length > 60 %}...{% endif %}
+        </td>
+        <td style="font-size:0.78rem;max-width:160px;">
+          {{ e.recommended_action[:60] }}
+          {% if e.recommended_action|length > 60 %}...{% endif %}
+        </td>
+        <td>
+          {% if e.referral_needed %}
+          <span style="color:#c53030;font-weight:700;">
+            Yes{% if e.facility_name %} → {{ e.facility_name[:15] }}{% endif %}
+          </span>
+          {% else %}No{% endif %}
+        </td>
+        <td style="font-size:0.75rem;color:#718096;">
+          {{ e.timestamp[:10] }}
+        </td>
+        <td>
+          <button class="btn btn-sm btn-primary"
+                  onclick="closeCase({{ e.id }})">
+            Close
+          </button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="placeholder">
+    <span class="placeholder-icon">✅</span>
+    <p>No open HIGH risk encounters.</p>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+
+// ── AI Morning Briefing ───────────────────────────────────────────────
+async function loadBriefing() {
+  document.getElementById('briefing-result').innerHTML =
+    `<div class="loading"><div class="spinner"></div>
+     <span>Generating district briefing... (30–60 sec)</span></div>`;
+  try {
+    const res = await fetch('/supervisor/api/briefing');
+    if (res.status === 401) {
+      window.location.href = '/login'; return;
+    }
+    const r = await res.json();
+    if (r.error) {
+      document.getElementById('briefing-result').innerHTML =
+        `<p style="color:#c53030">${r.error}</p>`;
+      return;
+    }
+
+    let html = `
+      <div style="background:#e8f5ee;border-radius:8px;padding:14px;margin-bottom:14px;">
+        <strong style="font-size:0.8rem;color:#1a6b3c;">EXECUTIVE SUMMARY</strong><br>
+        <p style="margin-top:4px;font-size:0.9rem;">${r.summary || ''}</p>
+      </div>`;
+
+    if (r.clinic_alerts && r.clinic_alerts.length) {
+      html += `<div style="margin-bottom:12px;">
+        <strong style="font-size:0.8rem;color:#718096;text-transform:uppercase;">
+          Clinic Alerts
+        </strong>`;
+      r.clinic_alerts.forEach(a => {
+        html += `<div style="display:flex;align-items:flex-start;gap:8px;
+                             padding:8px 0;border-bottom:1px solid #f0f4f8;">
+          <span style="color:${a.urgency === 'HIGH' ? '#c53030' : '#b7791f'};
+                       font-size:1rem;">⚠️</span>
+          <div>
+            <strong>${a.clinic}</strong>
+            <span style="font-size:0.82rem;color:#4a5568;"> — ${a.issue}</span>
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+
+    if (r.recommended_actions && r.recommended_actions.length) {
+      html += `<div>
+        <strong style="font-size:0.8rem;color:#718096;text-transform:uppercase;">
+          Recommended Actions
+        </strong>`;
+      r.recommended_actions.forEach((a, i) => {
+        html += `<div style="display:flex;gap:10px;padding:8px 0;
+                             border-bottom:1px solid #f0f4f8;">
+          <span style="background:#1a6b3c;color:white;border-radius:50%;
+                       width:22px;height:22px;display:flex;align-items:center;
+                       justify-content:center;font-size:0.75rem;flex-shrink:0;">
+            ${i + 1}
+          </span>
+          <div style="font-size:0.85rem;">
+            ${a.action}
+            <span style="color:#718096;font-size:0.78rem;">
+              — ${a.assigned_to} · ${a.deadline}
+            </span>
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+
+    if (r.supply_chain_flags && r.supply_chain_flags.length) {
+      html += `<div style="background:#fffbeb;border-radius:7px;
+                           padding:10px;margin-top:10px;font-size:0.82rem;">
+        <strong>⚠️ Supply Chain:</strong>
+        ${r.supply_chain_flags.join(' · ')}
+      </div>`;
+    }
+
+    html += `<div style="font-size:0.72rem;color:#718096;
+                         font-style:italic;margin-top:10px;">
+      ${r._model || 'Microsoft Phi-4 via Azure AI Foundry'}
+    </div>`;
+
+    document.getElementById('briefing-result').innerHTML = html;
+  } catch (e) {
+    document.getElementById('briefing-result').innerHTML =
+      `<p style="color:#c53030">Error: ${e.message}</p>`;
+  }
+}
+
+// ── Submit Supervisor Feedback ────────────────────────────────────────
+async function submitFeedback(encounterId) {
+  const feedback = document.getElementById(`feedback-${encounterId}`).value.trim();
+  if (!feedback) {
+    alert('Please enter feedback before submitting.');
+    return;
+  }
+  try {
+    const res = await fetch(`/supervisor/api/feedback/${encounterId}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({feedback})
+    });
+    if (res.status === 401) { window.location.href = '/login'; return; }
+    const r = await res.json();
+    const msg = document.getElementById(`feedback-msg-${encounterId}`);
+    if (r.success) {
+      msg.style.color = '#276749';
+      msg.textContent = '✅ Feedback submitted.';
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      msg.style.color = '#c53030';
+      msg.textContent = '❌ ' + (r.error || 'Failed.');
+    }
+  } catch (e) {
+    alert('Connection error.');
+  }
+}
+
+// ── Close Case ────────────────────────────────────────────────────────
+async function closeCase(encounterId) {
+  if (!confirm('Mark this case as closed?')) return;
+  try {
+    const res = await fetch(`/supervisor/api/close-encounter/${encounterId}`, {
+      method: 'POST'
+    });
+    if (res.status === 401) { window.location.href = '/login'; return; }
+    const r = await res.json();
+    if (r.success) {
+      alert('✅ Case closed.');
+      location.reload();
+    }
+  } catch (e) {
+    alert('Connection error.');
+  }
+}
+</script>
+{% endblock %}
