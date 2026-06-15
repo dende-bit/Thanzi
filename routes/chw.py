@@ -122,6 +122,69 @@ def assess():
     return render_template('chw_assess.html', patients=patients)
 
 
+@chw_bp.route('/stock', methods=['GET'])
+@role_required('CHW')
+def stock():
+    chw_id = session['user_id']
+    with get_db() as conn:
+        stock_history = conn.execute("""
+            SELECT * FROM medicine_stock
+            WHERE chw_id = ?
+            ORDER BY reported_at DESC
+            LIMIT 10
+        """, (chw_id,)).fetchall()
+
+        last_stock = conn.execute(
+            "SELECT * FROM medicine_stock WHERE chw_id = ? ORDER BY reported_at DESC LIMIT 1",
+            (chw_id,)
+        ).fetchone()
+
+    return render_template('chw_stock.html',
+                           stock_history=stock_history,
+                           last_stock=last_stock)
+
+
+@chw_bp.route('/patients')
+@role_required('CHW')
+def patients():
+    with get_db() as conn:
+        patient_list = conn.execute("""
+            SELECT p.*, COUNT(e.id) as encounter_count,
+                   MAX(e.timestamp) as last_encounter,
+                   MAX(e.risk_level) as highest_risk
+            FROM patients p
+            LEFT JOIN encounters e ON p.national_id = e.patient_id
+            WHERE p.registered_by_chw_id = ?
+            GROUP BY p.national_id
+            ORDER BY p.name
+        """, (session['user_id'],)).fetchall()
+    return render_template('chw_patients.html', patients=patient_list)
+
+
+@chw_bp.route('/patient/<national_id>')
+@role_required('CHW')
+def patient_history(national_id):
+    with get_db() as conn:
+        patient = conn.execute(
+            "SELECT * FROM patients WHERE national_id = ? AND registered_by_chw_id = ?",
+            (national_id, session['user_id'])
+        ).fetchone()
+
+        if not patient:
+            flash('Patient not found.', 'danger')
+            return redirect(url_for('chw.patients'))
+
+        encounters = conn.execute("""
+            SELECT e.*, f.name as facility_name
+            FROM encounters e
+            LEFT JOIN facilities f ON e.target_facility_id = f.id
+            WHERE e.patient_id = ?
+            ORDER BY e.timestamp DESC
+        """, (national_id,)).fetchall()
+
+    return render_template('chw_patient_history.html', patient=patient, encounters=encounters)
+
+
 @chw_bp.route('/api/voice-extract', methods=['POST'])
 @role_required('CHW')
 def voice_extract():
@@ -160,21 +223,21 @@ def save_encounter():
     data = request.json
     chw_id = session['user_id']
 
-    patient_id        = data.get('patient_id')
-    symptoms_original = data.get('symptoms_original', '')
-    symptoms_english  = data.get('symptoms_english', '')
-    detected_language = data.get('detected_language', 'Unknown')
-    risk_level        = data.get('risk_level', 'LOW')
-    assessment_notes  = data.get('assessment', '')
+    patient_id         = data.get('patient_id')
+    symptoms_original  = data.get('symptoms_original', '')
+    symptoms_english   = data.get('symptoms_english', '')
+    detected_language  = data.get('detected_language', 'Unknown')
+    risk_level         = data.get('risk_level', 'LOW')
+    assessment_notes   = data.get('assessment', '')
     recommended_action = data.get('action', '')
-    reasoning         = data.get('reasoning', '')
-    iccm_protocol     = data.get('iccm_protocol_applied', '')
-    referral_needed   = 1 if data.get('referral_needed') else 0
-    escalated         = 1 if data.get('emergency_escalation') else 0
-    follow_up_days    = int(data.get('follow_up_days', 3))
-    chichewa_message  = data.get('chichewa_action_phrase', '')
-    facility_id       = data.get('target_facility_id')
-    referral_urgency  = data.get('referral_urgency', '')
+    reasoning          = data.get('reasoning', '')
+    iccm_protocol      = data.get('iccm_protocol_applied', '')
+    referral_needed    = 1 if data.get('referral_needed') else 0
+    escalated          = 1 if data.get('emergency_escalation') else 0
+    follow_up_days     = int(data.get('follow_up_days', 3))
+    chichewa_message   = data.get('chichewa_action_phrase', '')
+    facility_id        = data.get('target_facility_id')
+    referral_urgency   = data.get('referral_urgency', '')
 
     if not patient_id:
         return jsonify({'error': 'patient_id is required'}), 400
@@ -275,6 +338,31 @@ def close_encounter(encounter_id):
     return jsonify({'success': True})
 
 
+@chw_bp.route('/api/update-outcome/<int:encounter_id>', methods=['POST'])
+@role_required('CHW')
+def update_outcome(encounter_id):
+    data = request.json
+    outcome = data.get('outcome', '').strip()
+    valid_outcomes = ['ONGOING', 'REFERRED', 'HEALED', 'REFERRED_COMPLETED', 'DECEASED']
+    if outcome not in valid_outcomes:
+        return jsonify({'error': 'Invalid outcome'}), 400
+    try:
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT chw_id FROM encounters WHERE id = ?", (encounter_id,)
+            ).fetchone()
+            if not row or row['chw_id'] != session['user_id']:
+                return jsonify({'error': 'Encounter not found'}), 404
+            record_closed = 1 if outcome in ['HEALED', 'REFERRED_COMPLETED', 'DECEASED'] else 0
+            conn.execute("""
+                UPDATE encounters SET outcome = ?, record_closed = ?
+                WHERE id = ?
+            """, (outcome, record_closed, encounter_id))
+        return jsonify({'success': True, 'outcome': outcome})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @chw_bp.route('/api/medicine-recommend', methods=['POST'])
 @role_required('CHW')
 def medicine_recommend():
@@ -290,7 +378,7 @@ def medicine_recommend():
         ).fetchone()
 
     if not last_stock:
-        return jsonify({'error': 'No stock reported yet. Report your medicine stock first on the Home page.'}), 400
+        return jsonify({'error': 'No stock reported yet. Report your medicine stock first.'}), 400
 
     stock_summary = f"""
 CHW Current Medicine Stock:
@@ -354,20 +442,3 @@ Respond ONLY in valid JSON:
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-
-@chw_bp.route('/patients')
-@role_required('CHW')
-def patients():
-    with get_db() as conn:
-        patient_list = conn.execute("""
-            SELECT p.*, COUNT(e.id) as encounter_count,
-                   MAX(e.timestamp) as last_encounter,
-                   MAX(e.risk_level) as highest_risk
-            FROM patients p
-            LEFT JOIN encounters e ON p.national_id = e.patient_id
-            WHERE p.registered_by_chw_id = ?
-            GROUP BY p.national_id
-            ORDER BY p.name
-        """, (session['user_id'],)).fetchall()
-    return render_template('chw_patients.html', patients=patient_list)

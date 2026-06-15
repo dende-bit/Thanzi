@@ -1,0 +1,244 @@
+{% extends 'base.html' %}
+{% block title %}Stock Report{% endblock %}
+
+{% block subnav %}
+<div class="subnav">
+  <a href="{{ url_for('chw.dashboard') }}">🏠 Home</a>
+  <a href="{{ url_for('chw.register_patient') }}">➕ Register Patient</a>
+  <a href="{{ url_for('chw.assess') }}">🩺 Assess & Triage</a>
+  <a href="{{ url_for('chw.patients') }}">👥 My Patients</a>
+  <a href="{{ url_for('chw.stock') }}" class="active">📦 Stock Report</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid-2">
+
+  <!-- Left: Report Form -->
+  <div class="card">
+    <div class="card-header">📦 Report Medicine Stock Levels</div>
+
+    <div style="background:#e6f4f7;border-radius:8px;padding:12px;margin-bottom:16px;font-size:0.85rem;color:#0a5c6e;">
+      Report your current stock levels. Your supervisor sees this immediately.
+      Report whenever stock is running low — do not wait until you run out.
+    </div>
+
+    <div class="form-group">
+      <label>Speak or type your stock levels</label>
+      <div style="display:flex;gap:8px;align-items:flex-start;">
+        <textarea id="stock-voice-text"
+                  placeholder='e.g. "ORS 20, paracetamol 8, malaria RDT 5, amoxicillin 12"'
+                  style="height:70px;flex:1;"></textarea>
+        <button onclick="startStockVoice(event)"
+                style="background:#0a5c6e;color:white;border:none;border-radius:50%;
+                       width:40px;height:40px;cursor:pointer;font-size:1rem;flex-shrink:0;">
+          🎤
+        </button>
+      </div>
+      <button onclick="parseStockFromText()"
+              class="btn btn-secondary btn-sm" style="margin-top:8px;">
+        Extract Numbers from Text →
+      </button>
+    </div>
+
+    <div style="border-top:1px solid #e2e8f0;margin:16px 0;"></div>
+
+    <div class="grid-2" style="gap:12px;">
+      <div class="form-group" style="margin:0;">
+        <label>ORS Sachets</label>
+        <input type="number" id="s-ors" placeholder="0" min="0">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Paracetamol (tablets)</label>
+        <input type="number" id="s-para" placeholder="0" min="0">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Amoxicillin (tablets)</label>
+        <input type="number" id="s-amox" placeholder="0" min="0">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Malaria RDTs</label>
+        <input type="number" id="s-rdt" placeholder="0" min="0">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Zinc (tablets)</label>
+        <input type="number" id="s-zinc" placeholder="0" min="0">
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-top:14px;">
+      <label>Additional Notes</label>
+      <input type="text" id="s-notes"
+             placeholder="e.g. Amoxicillin almost finished, need urgent resupply">
+    </div>
+
+    <button class="btn btn-primary btn-full" style="margin-top:6px;" onclick="submitStock()">
+      Submit Stock Report →
+    </button>
+
+    <div id="stock-msg" style="margin-top:10px;font-size:0.85rem;text-align:center;"></div>
+  </div>
+
+  <!-- Right: Current levels + history -->
+  <div>
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-header">📊 Current Stock Levels</div>
+      {% if last_stock %}
+      <p style="font-size:0.75rem;color:#a0aec0;margin-bottom:14px;">
+        Last reported: {{ last_stock.reported_at[:16] }}
+      </p>
+      <div class="grid-2" style="gap:10px;">
+        {% for field, label, threshold in [
+            ('ors',         'ORS Sachets',   10),
+            ('paracetamol', 'Paracetamol',   20),
+            ('amoxicillin', 'Amoxicillin',   10),
+            ('malaria_rdt', 'Malaria RDTs',   5),
+            ('zinc',        'Zinc Tablets',  10)
+        ] %}
+        <div style="background:#f7fafc;border-radius:8px;padding:12px;border-left:4px solid {% if last_stock[field] < threshold // 2 %}#c53030{% elif last_stock[field] < threshold %}#f6ad55{% else %}#0e8fa3{% endif %};">
+          <div style="font-size:0.75rem;color:#718096;font-weight:600;">{{ label }}</div>
+          <div style="font-size:1.5rem;font-weight:800;color:{% if last_stock[field] < threshold // 2 %}#c53030{% elif last_stock[field] < threshold %}#b7791f{% else %}#0a5c6e{% endif %};">
+            {{ last_stock[field] }}
+          </div>
+          <div style="font-size:0.7rem;color:#a0aec0;">units</div>
+          {% if last_stock[field] < threshold // 2 %}
+          <div style="font-size:0.7rem;color:#c53030;font-weight:700;margin-top:3px;">⚠️ CRITICAL — Resupply needed</div>
+          {% elif last_stock[field] < threshold %}
+          <div style="font-size:0.7rem;color:#b7791f;font-weight:600;margin-top:3px;">⚠️ Running low</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="placeholder">
+        <span class="placeholder-icon">📦</span>
+        <p>No stock reported yet. Submit your first report on the left.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if stock_history %}
+    <div class="card">
+      <div class="card-header">📋 Recent Reports</div>
+      <table class="data-table">
+        <thead>
+          <tr><th>Date</th><th>ORS</th><th>Para</th><th>Amox</th><th>RDT</th><th>Zinc</th></tr>
+        </thead>
+        <tbody>
+          {% for s in stock_history %}
+          <tr>
+            <td style="font-size:0.78rem;color:#718096;">{{ s.reported_at[:10] }}</td>
+            <td>{{ s.ors }}</td>
+            <td>{{ s.paracetamol }}</td>
+            <td>{{ s.amoxicillin }}</td>
+            <td>{{ s.malaria_rdt }}</td>
+            <td>{{ s.zinc }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+
+function startStockVoice(evt) {
+  evt.preventDefault();
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    alert('Voice input requires Chrome browser.');
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const r = new SR();
+  r.lang = 'en-US';
+  r.interimResults = false;
+  const btn = evt.target;
+  btn.textContent = '⏹';
+  btn.style.background = '#c53030';
+  r.onresult = (e) => {
+    document.getElementById('stock-voice-text').value = e.results[0][0].transcript;
+    btn.textContent = '🎤';
+    btn.style.background = '#0a5c6e';
+  };
+  r.onerror = r.onend = () => {
+    btn.textContent = '🎤';
+    btn.style.background = '#0a5c6e';
+  };
+  r.start();
+}
+
+function parseStockFromText() {
+  const t = document.getElementById('stock-voice-text').value.toLowerCase();
+  if (!t.trim()) {
+    alert('Please type or speak something first.');
+    return;
+  }
+
+  function extract(keys) {
+    for (const k of keys) {
+      const pattern = new RegExp(k + '[^0-9]*([0-9]+)');
+      const m = t.match(pattern);
+      if (m) return m[1];
+    }
+    return '';
+  }
+
+  const ors   = extract(['ors', 'oral rehydration']);
+  const para  = extract(['paracetamol', 'panadol', 'para']);
+  const amox  = extract(['amoxicillin', 'amox', 'antibiotic']);
+  const rdt   = extract(['malaria rdt', 'malaria test', 'rapid test', 'rdt', 'malaria']);
+  const zinc  = extract(['zinc']);
+
+  if (ors)  document.getElementById('s-ors').value  = ors;
+  if (para) document.getElementById('s-para').value = para;
+  if (amox) document.getElementById('s-amox').value = amox;
+  if (rdt)  document.getElementById('s-rdt').value  = rdt;
+  if (zinc) document.getElementById('s-zinc').value = zinc;
+
+  if (!ors && !para && !amox && !rdt && !zinc) {
+    alert('Could not extract numbers. Try format: "ORS 20, paracetamol 8, RDT 5"');
+  }
+}
+
+async function submitStock() {
+  const payload = {
+    ors:         parseInt(document.getElementById('s-ors').value)  || 0,
+    paracetamol: parseInt(document.getElementById('s-para').value) || 0,
+    amoxicillin: parseInt(document.getElementById('s-amox').value) || 0,
+    malaria_rdt: parseInt(document.getElementById('s-rdt').value)  || 0,
+    zinc:        parseInt(document.getElementById('s-zinc').value) || 0,
+    notes:       document.getElementById('s-notes').value
+  };
+
+  const total = payload.ors + payload.paracetamol + payload.amoxicillin + payload.malaria_rdt + payload.zinc;
+  if (total === 0) {
+    alert('Please enter at least one stock value before submitting.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/chw/api/report-stock', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const r = await res.json();
+    const msg = document.getElementById('stock-msg');
+    if (r.success) {
+      msg.style.color = '#0a5c6e';
+      msg.textContent = '✅ Stock report submitted. Your supervisor has been updated.';
+      setTimeout(() => location.reload(), 1800);
+    } else {
+      msg.style.color = '#c53030';
+      msg.textContent = '❌ ' + (r.error || 'Submission failed.');
+    }
+  } catch (e) {
+    document.getElementById('stock-msg').textContent = '❌ Connection error.';
+  }
+}
+</script>
+{% endblock %}

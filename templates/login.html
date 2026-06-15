@@ -3,34 +3,223 @@
 
 {% block extra_css %}
 <style>
-body{background:linear-gradient(135deg,#1a6b3c 0%,#145a32 50%,#0d3d22 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;}
-.login-wrapper{width:100%;max-width:420px;padding:20px;}
-.login-card{background:white;border-radius:16px;padding:40px 36px;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
-.login-logo{text-align:center;margin-bottom:28px;}
-.login-logo h1{font-size:2.2rem;color:#1a6b3c;font-weight:800;letter-spacing:2px;}
-.login-logo p{color:#718096;font-size:0.88rem;margin-top:4px;}
-.login-logo .subtitle{color:#2d9b5a;font-size:0.82rem;font-weight:600;margin-top:6px;background:#e8f5ee;padding:4px 12px;border-radius:20px;display:inline-block;}
-.login-error{background:#fff5f5;color:#c53030;border:1px solid #fc8181;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:0.88rem;display:flex;align-items:center;gap:8px;}
-.login-field{margin-bottom:16px;}
-.login-field label{display:block;font-size:0.8rem;font-weight:700;color:#4a5568;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;}
-.login-field input{width:100%;padding:12px 14px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.95rem;transition:border 0.2s;}
-.login-field input:focus{outline:none;border-color:#2d9b5a;box-shadow:0 0 0 3px rgba(45,155,90,0.1);}
-.login-btn{width:100%;padding:13px;background:linear-gradient(135deg,#1a6b3c,#2d9b5a);color:white;border:none;border-radius:8px;font-size:1rem;font-weight:700;cursor:pointer;transition:opacity 0.2s;margin-top:6px;}
-.login-btn:hover{opacity:0.9;}
-.login-hint{background:#f7fafc;border-radius:8px;padding:12px 14px;margin-top:20px;font-size:0.8rem;color:#718096;border:1px solid #e2e8f0;}
-.login-hint strong{color:#2d3748;}
-.powered-by{text-align:center;margin-top:20px;font-size:0.75rem;color:rgba(255,255,255,0.6);}
-.powered-by span{color:rgba(255,255,255,0.9);font-weight:600;}
-footer{display:none;}
-.flash-container{display:none;}
+body {
+  background: #052e38;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-wrapper {
+  display: flex;
+  width: 100%;
+  max-width: 900px;
+  min-height: 540px;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+  margin: 20px;
+}
+
+.login-image-side {
+  flex: 1;
+  background-image: url('/static/hsa_field.png');
+  background-size: cover;
+  background-position: center top;
+  position: relative;
+  min-height: 400px;
+}
+
+.login-image-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    rgba(5,46,56,0.15) 0%,
+    rgba(5,46,56,0.6) 100%
+  );
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 28px;
+}
+
+.login-image-quote {
+  color: white;
+  font-size: 1rem;
+  font-style: italic;
+  line-height: 1.6;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+}
+
+.login-image-quote span {
+  display: block;
+  font-style: normal;
+  font-size: 0.78rem;
+  margin-top: 6px;
+  opacity: 0.8;
+}
+
+.login-card-side {
+  width: 380px;
+  flex-shrink: 0;
+  background: white;
+  padding: 44px 36px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.login-logo {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.login-logo h1 {
+  font-size: 2rem;
+  color: #0a5c6e;
+  font-weight: 800;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.login-logo h1 .cross {
+  font-size: 1.6rem;
+  color: #e53e3e;
+  font-style: normal;
+}
+
+.login-logo p {
+  color: #718096;
+  font-size: 0.85rem;
+  margin-top: 6px;
+}
+
+.login-logo .subtitle {
+  color: #0a5c6e;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-top: 8px;
+  background: #e6f4f7;
+  padding: 4px 12px;
+  border-radius: 20px;
+  display: inline-block;
+}
+
+.login-error {
+  background: #fff5f5;
+  color: #c53030;
+  border: 1px solid #fc8181;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.login-field {
+  margin-bottom: 16px;
+}
+
+.login-field label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #4a5568;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.login-field input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  transition: border 0.2s;
+  font-family: inherit;
+}
+
+.login-field input:focus {
+  outline: none;
+  border-color: #0e8fa3;
+  box-shadow: 0 0 0 3px rgba(14,143,163,0.1);
+}
+
+.login-btn {
+  width: 100%;
+  padding: 13px;
+  background: linear-gradient(135deg, #0a5c6e, #0e8fa3);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  margin-top: 4px;
+  font-family: inherit;
+}
+
+.login-btn:hover { opacity: 0.9; }
+
+.login-hint {
+  background: #f7fafc;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-top: 18px;
+  font-size: 0.78rem;
+  color: #718096;
+  border: 1px solid #e2e8f0;
+  line-height: 1.6;
+}
+
+.login-hint strong { color: #2d3748; }
+
+.powered {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 0.72rem;
+  color: #a0aec0;
+}
+
+footer { display: none; }
+.flash-container { display: none; }
+
+@media (max-width: 640px) {
+  .login-image-side { display: none; }
+  .login-card-side { width: 100%; }
+  .login-wrapper { border-radius: 12px; }
+}
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="login-wrapper">
-  <div class="login-card">
+
+  <!-- Left: Field photo -->
+  <div class="login-image-side">
+    <div class="login-image-overlay">
+      <div class="login-image-quote">
+        "When a Community Health Worker guesses wrong, a child dies.
+        Thanzi was built so they never have to guess."
+        <span>— Built in Mzuzu, Malawi</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Login form -->
+  <div class="login-card-side">
+
     <div class="login-logo">
-      <h1>🌿 Thanzi</h1>
+      <h1><span class="cross">✚</span> Thanzi</h1>
       <p>Community Health Intelligence Agent</p>
       <span class="subtitle">Serving Malawi's Health Workers</span>
     </div>
@@ -42,12 +231,14 @@ footer{display:none;}
     <form method="POST" action="{{ url_for('auth.login') }}">
       <div class="login-field">
         <label>Username</label>
-        <input type="text" name="username" placeholder="Enter your username"
+        <input type="text" name="username"
+               placeholder="Enter your username"
                autocomplete="username" autofocus required>
       </div>
       <div class="login-field">
         <label>Password</label>
-        <input type="password" name="password" placeholder="Enter your password"
+        <input type="password" name="password"
+               placeholder="Enter your password"
                autocomplete="current-password" required>
       </div>
       <button type="submit" class="login-btn">Sign In →</button>
@@ -55,13 +246,15 @@ footer{display:none;}
 
     <div class="login-hint">
       <strong>Default admin credentials:</strong><br>
-      Username: <strong>admin</strong> &nbsp;|&nbsp; Password: <strong>thanzi_admin_2026</strong><br><br>
+      Username: <strong>admin</strong> &nbsp;|&nbsp;
+      Password: <strong>thanzi_admin_2026</strong><br><br>
       <strong>Roles:</strong> ADMIN · CHW · SUPERVISOR · DHO
     </div>
-  </div>
 
-  <div class="powered-by">
-    Powered by <span>Microsoft Phi-4</span> via Azure AI Foundry
+    <div class="powered">
+      Powered by <strong>Microsoft Phi-4</strong> via Azure AI Foundry
+    </div>
+
   </div>
 </div>
 {% endblock %}

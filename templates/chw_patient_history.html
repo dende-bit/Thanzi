@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% block title %}Patient History{% endblock %}
+
+{% block subnav %}
+<div class="subnav">
+  <a href="{{ url_for('chw.dashboard') }}">🏠 Home</a>
+  <a href="{{ url_for('chw.register_patient') }}">➕ Register Patient</a>
+  <a href="{{ url_for('chw.assess') }}">🩺 Assess & Triage</a>
+  <a href="{{ url_for('chw.patients') }}" class="active">👥 My Patients</a>
+  <a href="{{ url_for('chw.stock') }}">📦 Stock Report</a>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.encounter-card{border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:14px;background:white;}
+.encounter-card.high{border-left:4px solid #c53030;}
+.encounter-card.medium{border-left:4px solid #f6ad55;}
+.encounter-card.low{border-left:4px solid #68d391;}
+.outcome-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;}
+.outcome-ONGOING{background:#e8f0fe;color:#2c5282;}
+.outcome-REFERRED{background:#fffbeb;color:#b7791f;}
+.outcome-HEALED{background:#e8f5ee;color:#1a6b3c;}
+.outcome-REFERRED_COMPLETED{background:#f0fff4;color:#276749;}
+.outcome-DECEASED{background:#f0f0f0;color:#4a5568;}
+.outcome-btn{padding:6px 14px;border-radius:6px;font-size:0.78rem;font-weight:600;cursor:pointer;border:1.5px solid #e2e8f0;background:white;color:#4a5568;margin-right:6px;margin-top:8px;transition:all 0.15s;}
+.outcome-btn:hover{border-color:#2d9b5a;color:#1a6b3c;background:#f0fff4;}
+.outcome-btn.active{background:#1a6b3c;color:white;border-color:#1a6b3c;}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-header">👤 {{ patient.name }}</div>
+  <div class="grid-4">
+    <div>
+      <div style="font-size:0.72rem;color:#718096;text-transform:uppercase;font-weight:700;">National ID</div>
+      <div style="font-size:0.9rem;margin-top:2px;">{{ patient.national_id }}</div>
+    </div>
+    <div>
+      <div style="font-size:0.72rem;color:#718096;text-transform:uppercase;font-weight:700;">Age</div>
+      <div style="font-size:0.9rem;margin-top:2px;">{{ (patient.age_months // 12) }}y {{ (patient.age_months % 12) }}m</div>
+    </div>
+    <div>
+      <div style="font-size:0.72rem;color:#718096;text-transform:uppercase;font-weight:700;">Gender</div>
+      <div style="font-size:0.9rem;margin-top:2px;">{{ patient.gender }}</div>
+    </div>
+    <div>
+      <div style="font-size:0.72rem;color:#718096;text-transform:uppercase;font-weight:700;">Village</div>
+      <div style="font-size:0.9rem;margin-top:2px;">{{ patient.village or '—' }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">📋 Encounter History ({{ encounters | length }})</div>
+
+  {% if encounters %}
+    {% for e in encounters %}
+    <div class="encounter-card {{ e.risk_level | lower }}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+        <div>
+          <span class="risk-badge risk-{{ e.risk_level }}">{{ e.risk_level }}</span>
+          <span class="outcome-badge outcome-{{ e.outcome }}" style="margin-left:6px;">
+            {{ e.outcome.replace('_', ' ') }}
+          </span>
+        </div>
+        <span style="font-size:0.78rem;color:#a0aec0;">{{ e.timestamp[:16] }}</span>
+      </div>
+
+      <div style="font-size:0.85rem;color:#4a5568;margin-top:10px;line-height:1.6;">
+        <strong>Symptoms:</strong> {{ e.symptoms_english }}<br>
+        <strong>Assessment:</strong> {{ e.assessment_notes }}<br>
+        <strong>Action:</strong> {{ e.recommended_action }}<br>
+        {% if e.iccm_protocol_applied %}<strong>Protocol:</strong> {{ e.iccm_protocol_applied }}<br>{% endif %}
+        {% if e.referral_needed %}
+          <strong>Referred to:</strong> {{ e.facility_name or 'Facility (not specified)' }}
+          {% if e.referral_urgency %}<span style="color:#c53030;font-weight:700;"> — {{ e.referral_urgency }}</span>{% endif %}<br>
+        {% endif %}
+        {% if e.chichewa_family_message %}
+        <div style="background:#fffef0;border:1px solid #e8e0a0;border-radius:7px;padding:8px 10px;margin-top:8px;font-style:italic;font-size:0.83rem;">
+          🗣️ "{{ e.chichewa_family_message }}"
+        </div>
+        {% endif %}
+      </div>
+
+      {% if not e.record_closed %}
+      <div style="margin-top:4px;">
+        <div style="font-size:0.7rem;color:#718096;text-transform:uppercase;font-weight:700;margin-bottom:4px;">
+          Update outcome:
+        </div>
+
+        {% if e.outcome == 'REFERRED' %}
+          <button class="outcome-btn" onclick="updateOutcome({{ e.id }}, 'REFERRED_COMPLETED', this)">✅ Confirmed Recovered After Referral</button>
+          <button class="outcome-btn" onclick="updateOutcome({{ e.id }}, 'ONGOING', this)">↩️ Still Under Care — Continue Follow-up</button>
+          <button class="outcome-btn" onclick="updateOutcome({{ e.id }}, 'DECEASED', this)">⚫ Patient Did Not Survive</button>
+        {% else %}
+          <button class="outcome-btn" onclick="updateOutcome({{ e.id }}, 'HEALED', this)">✅ Healed — Close Case</button>
+          <button class="outcome-btn" onclick="updateOutcome({{ e.id }}, 'ONGOING', this)">↩️ Needs Continued Follow-up</button>
+          <button class="outcome-btn" onclick="updateOutcome({{ e.id }}, 'DECEASED', this)">⚫ Patient Did Not Survive</button>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <div id="outcome-msg-{{ e.id }}" style="font-size:0.8rem;margin-top:6px;"></div>
+    </div>
+    {% endfor %}
+  {% else %}
+  <div class="placeholder">
+    <span class="placeholder-icon">📋</span>
+    <p>No encounters recorded yet for this patient.</p>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function updateOutcome(encounterId, outcome, btn) {
+  const labels = {
+    'HEALED': 'Healed',
+    'REFERRED_COMPLETED': 'Referral confirmed — recovered',
+    'ONGOING': 'Marked for continued follow-up',
+    'DECEASED': 'Recorded as deceased'
+  };
+
+  if (outcome === 'DECEASED' && !confirm('Are you sure you want to record this patient as deceased? This cannot be undone easily.')) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/chw/api/update-outcome/${encounterId}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({outcome})
+    });
+    if (res.status === 401) { window.location.href = '/login'; return; }
+    const r = await res.json();
+    const msg = document.getElementById(`outcome-msg-${encounterId}`);
+    if (r.success) {
+      msg.style.color = '#276749';
+      msg.textContent = `✅ ${labels[outcome] || 'Updated'}`;
+      setTimeout(() => location.reload(), 1200);
+    } else {
+      msg.style.color = '#c53030';
+      msg.textContent = '❌ ' + (r.error || 'Failed.');
+    }
+  } catch (e) {
+    alert('Connection error.');
+  }
+}
+</script>
+{% endblock %}

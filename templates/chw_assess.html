@@ -7,6 +7,7 @@
   <a href="{{ url_for('chw.register_patient') }}">➕ Register Patient</a>
   <a href="{{ url_for('chw.assess') }}" class="active">🩺 Assess & Triage</a>
   <a href="{{ url_for('chw.patients') }}">👥 My Patients</a>
+  <a href="{{ url_for('chw.stock') }}">📦 Stock Report</a>
 </div>
 {% endblock %}
 
@@ -101,8 +102,6 @@
     <input type="hidden" id="m-patient-id-hidden">
 
     <button class="btn btn-primary btn-full" onclick="runManualAssess()">Run Assessment →</button>
-
-    <div class="timeout-note">⏱ Assessment takes 30–60 seconds on mobile data. Please wait after clicking.</div>
   </div>
 
   <!-- MULTI-TRIAGE TAB -->
@@ -275,10 +274,6 @@ function displayResult(r, name, age, patientId) {
     <div class="result-field"><div class="lbl">Recommended Action</div><p>${r.action}</p></div>
     <div class="result-field"><div class="lbl">iCCM Protocol</div><p>${r.iccm_protocol_applied || '—'}</p></div>
     <div class="result-field"><div class="lbl">Follow-up In</div><p>${r.follow_up_days || 3} days</p></div>
-    ${r.chichewa_action_phrase ? `
-    <div style="background:#fffef0;border:1px solid #e8e0a0;border-radius:7px;padding:10px;font-style:italic;margin-bottom:10px;font-size:0.85rem;">
-      <strong style="font-style:normal;font-size:0.72rem;color:#9a8800;">🗣️ CHICHEWA — Say to family:</strong><br>"${r.chichewa_action_phrase}"
-    </div>` : ''}
     <div style="font-size:0.72rem;color:#718096;font-style:italic;margin-bottom:10px;">${r._model || 'Microsoft Phi-4 via Azure AI Foundry'}</div>
     ${saveBtn}${escalateBtn}${medBtn}`;
 }
@@ -324,9 +319,6 @@ async function runEscalation() {
           PATIENT: ${note.patient_name || ''}, ${note.age || ''}<br>
           URGENCY: <strong>${note.urgency || ''}</strong><br>
           REASON: ${note.reason_for_referral || ''}
-        </div>
-        <div style="background:#fffef0;border:1px solid #e8e0a0;border-radius:7px;padding:10px;font-style:italic;font-size:0.85rem;">
-          🗣️ "${r.chichewa_family_message || ''}"
         </div>
       </div>`;
   } catch (e) {

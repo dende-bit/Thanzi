@@ -113,7 +113,9 @@ def init_db():
                                         CHECK(referral_urgency IN ('', 'ROUTINE', 'URGENT', 'EMERGENCY')),
                 chichewa_family_message TEXT    NOT NULL DEFAULT '',
                 follow_up_days          INTEGER NOT NULL DEFAULT 3,
-                record_closed           INTEGER NOT NULL DEFAULT 0
+                record_closed           INTEGER NOT NULL DEFAULT 0,
+                outcome                 TEXT    NOT NULL DEFAULT 'ONGOING'
+                                        CHECK(outcome IN ('ONGOING', 'REFERRED', 'HEALED', 'REFERRED_COMPLETED', 'DECEASED'))
             )
         """)
 
